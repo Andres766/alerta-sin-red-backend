@@ -1,0 +1,21 @@
+[project]
+name = "alerta-sin-red-backend"
+version = "0.1.0"
+description = "API de alertas de riesgo climático offline-first con IA"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101"]  # assert permitido en pruebas
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+"ml/**" = ["S301"]

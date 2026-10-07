@@ -1,0 +1,74 @@
+{
+  "version": "rf-20260929-0225",
+  "algorithm": "RandomForestClassifier",
+  "trained_at": "2026-09-29T02:25:55.056705+00:00",
+  "data_source": "sintetico-fisico-v1",
+  "n_samples": 20000,
+  "feature_order": [
+    "rain_24h_mm",
+    "rain_72h_mm",
+    "rain_7d_mm",
+    "rain_forecast_24h_mm",
+    "soil_moisture",
+    "river_discharge_ratio",
+    "slope_deg",
+    "susceptibility"
+  ],
+  "classes": [
+    "ALTO",
+    "BAJO",
+    "MODERADO",
+    "MUY_ALTO"
+  ],
+  "class_distribution": {
+    "BAJO": 9787,
+    "MODERADO": 5714,
+    "ALTO": 2881,
+    "MUY_ALTO": 1618
+  },
+  "metrics": {
+    "cv_f1_macro_mean": 0.8374,
+    "cv_f1_macro_std": 0.0056,
+    "test_f1_macro": 0.8357,
+    "test_accuracy": 0.8375,
+    "recall_alto": 0.8021,
+    "recall_muy_alto": 0.9228,
+    "confusion_matrix": [
+      [
+        1667,
+        290,
+        0,
+        0
+      ],
+      [
+        119,
+        922,
+        102,
+        0
+      ],
+      [
+        0,
+        72,
+        462,
+        42
+      ],
+      [
+        0,
+        0,
+        25,
+        299
+      ]
+    ]
+  },
+  "feature_importances": {
+    "rain_7d_mm": 0.2192,
+    "rain_72h_mm": 0.1812,
+    "susceptibility": 0.1567,
+    "soil_moisture": 0.1455,
+    "river_discharge_ratio": 0.1046,
+    "rain_forecast_24h_mm": 0.079,
+    "slope_deg": 0.0593,
+    "rain_24h_mm": 0.0545
+  },
+  "sha256": "30f5957c06f9c2465674ace79b9d78df98d279d940a99d65adef8772de393365"
+}
