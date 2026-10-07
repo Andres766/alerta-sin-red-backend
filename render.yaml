@@ -1,0 +1,54 @@
+# Blueprint de Render: crea la API (Docker) y la base de datos PostgreSQL.
+# Render → New → Blueprint → seleccione este repositorio.
+# Las variables marcadas con "sync: false" se piden en el panel al crear el Blueprint.
+
+databases:
+  - name: alerta-sin-red-db
+    plan: free
+    region: virginia # la región más cercana a Colombia
+    databaseName: alerta_sin_red
+    user: alerta
+
+services:
+  - type: web
+    name: alerta-sin-red-api
+    runtime: docker
+    plan: free
+    region: virginia # misma región que la base de datos (conexión interna)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: REPOSITORY_BACKEND
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alerta-sin-red-db
+          property: connectionString
+      # Secretos generados por Render (aleatorios, nunca en el repositorio)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PHONE_INDEX_KEY
+        generateValue: true
+      # Debe ser una clave Fernet válida: genérela con `python -m app.cli gen-keys`
+      - key: PHONE_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Dominio de Vercel, en formato JSON: ["https://su-app.vercel.app"]
+      - key: CORS_ORIGINS
+        sync: false
+      - key: WEATHER_PROVIDER
+        value: open_meteo
+      - key: SMS_PROVIDER
+        value: console
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_INTERVAL_MINUTES
+        value: "60"
+      - key: EXPOSE_DOCS
+        value: "true" # Swagger visible para la presentación; ponga "false" al terminar
