@@ -19,6 +19,7 @@ from app.application.services.alert_dispatcher import AlertDispatcher
 from app.application.services.auth import AuthService
 from app.application.services.risk_assessment import RiskAssessmentService
 from app.application.services.subscriptions import SubscriptionService
+from app.application.services.users import UserManagementService
 from app.application.services.zones import ZoneQueryService
 from app.core.config import Settings
 from app.core.security import (
@@ -86,6 +87,9 @@ class Container:
 
     def zone_queries(self, uow: UnitOfWork) -> ZoneQueryService:
         return ZoneQueryService(uow)
+
+    def user_management(self, uow: UnitOfWork) -> UserManagementService:
+        return UserManagementService(uow, self.hasher)
 
     def auth_service(self, uow: UnitOfWork) -> AuthService:
         return AuthService(uow, self.hasher, self.tokens, self._dummy_hash)

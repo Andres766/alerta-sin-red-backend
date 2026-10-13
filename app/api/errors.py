@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app.domain.exceptions import (
     AuthenticationError,
     AuthorizationError,
+    ConflictError,
     DomainError,
     ExternalServiceError,
     NotFoundError,
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 _STATUS_BY_ERROR: list[tuple[type[DomainError], int]] = [
     (ValidationError, status.HTTP_422_UNPROCESSABLE_CONTENT),
     (NotFoundError, status.HTTP_404_NOT_FOUND),
+    (ConflictError, status.HTTP_409_CONFLICT),
     (AuthenticationError, status.HTTP_401_UNAUTHORIZED),
     (AuthorizationError, status.HTTP_403_FORBIDDEN),
     (ExternalServiceError, status.HTTP_503_SERVICE_UNAVAILABLE),

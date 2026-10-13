@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.container import Container
 from app.core.security import SlidingWindowRateLimiter
-from app.domain.entities import Role
+from app.domain.entities import Role, User
 from app.domain.ports import TokenClaims, UnitOfWork
 
 _bearer = HTTPBearer(auto_error=False)
@@ -42,14 +42,32 @@ def current_claims(
     return container.tokens.decode(credentials.credentials)  # AuthenticationError -> 401
 
 
-def require_role(*roles: Role) -> Callable[[TokenClaims], TokenClaims]:
-    """Control de acceso basado en roles (RBAC)."""
-    allowed = {r.value for r in roles}
+def current_user(
+    claims: Annotated[TokenClaims, Depends(current_claims)], uow: UowDep
+) -> User:
+    """Revalida el token contra la base de datos en cada petición.
 
-    def checker(claims: Annotated[TokenClaims, Depends(current_claims)]) -> TokenClaims:
-        if claims.role not in allowed:
+    Un JWT sigue siendo válido hasta que expira; consultando al usuario, una
+    cuenta desactivada o con el rol cambiado pierde el acceso de inmediato.
+    """
+    user = uow.users.get_by_email(claims.subject)
+    if user is None or not user.active:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "No autenticado", {"WWW-Authenticate": "Bearer"}
+        )
+    return user
+
+
+CurrentUser = Annotated[User, Depends(current_user)]
+
+
+def require_role(*roles: Role) -> Callable[[User], User]:
+    """Control de acceso basado en roles (RBAC), con el rol vigente en la base de datos."""
+
+    def checker(user: CurrentUser) -> User:
+        if user.role not in roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Permisos insuficientes")
-        return claims
+        return user
 
     return checker
 

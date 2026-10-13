@@ -127,8 +127,14 @@ class InMemoryUserRepository(UserRepository):
     def __init__(self, store: InMemoryStore) -> None:
         self._s = store
 
+    def get(self, user_id: UUID) -> User | None:
+        return next((u for u in self._s.users.values() if u.id == user_id), None)
+
     def get_by_email(self, email: str) -> User | None:
         return self._s.users.get(email)
+
+    def list_all(self) -> list[User]:
+        return sorted(self._s.users.values(), key=lambda u: u.created_at)
 
     def add(self, user: User) -> None:
         with self._s.lock:

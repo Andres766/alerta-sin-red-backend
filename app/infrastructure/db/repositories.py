@@ -286,22 +286,33 @@ class SqlAlertRepository(AlertRepository):
         return [_to_notification(r) for r in rows]
 
 
+def _to_user(row: UserModel) -> User:
+    return User(
+        id=row.id,
+        email=row.email,
+        password_hash=row.password_hash,
+        role=row.role,
+        active=row.active,
+        created_at=row.created_at,
+    )
+
+
 class SqlUserRepository(UserRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def get(self, user_id: UUID) -> User | None:
+        row = self._session.get(UserModel, user_id)
+        return _to_user(row) if row else None
+
     def get_by_email(self, email: str) -> User | None:
         row = self._session.scalars(select(UserModel).where(UserModel.email == email)).first()
-        if row is None:
-            return None
-        return User(
-            id=row.id,
-            email=row.email,
-            password_hash=row.password_hash,
-            role=row.role,
-            active=row.active,
-            created_at=row.created_at,
-        )
+        return _to_user(row) if row else None
+
+    def list_all(self) -> list[User]:
+        return [_to_user(r) for r in self._session.scalars(
+            select(UserModel).order_by(UserModel.created_at)
+        )]
 
     def add(self, user: User) -> None:
         self._session.merge(

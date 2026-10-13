@@ -35,6 +35,16 @@ class ZoneNotFoundError(NotFoundError):
     code = "zone_not_found"
 
 
+class ConflictError(DomainError):
+    """La operación choca con el estado actual (duplicado, regla de negocio)."""
+
+    code = "conflict"
+
+
+class UserAlreadyExistsError(ConflictError):
+    code = "user_exists"
+
+
 class AuthenticationError(DomainError):
     code = "authentication_failed"
 

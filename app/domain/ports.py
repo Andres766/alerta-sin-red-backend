@@ -82,7 +82,13 @@ class AlertRepository(ABC):
 
 class UserRepository(ABC):
     @abstractmethod
+    def get(self, user_id: UUID) -> User | None: ...
+
+    @abstractmethod
     def get_by_email(self, email: str) -> User | None: ...
+
+    @abstractmethod
+    def list_all(self) -> list[User]: ...
 
     @abstractmethod
     def add(self, user: User) -> None: ...

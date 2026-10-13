@@ -161,3 +161,13 @@ class User:
 
     def can_trigger_evaluations(self) -> bool:
         return self.active and self.role in (Role.ADMIN, Role.OPERATOR)
+
+    @property
+    def is_admin(self) -> bool:
+        return self.active and self.role is Role.ADMIN
+
+    def deactivate(self) -> None:
+        self.active = False
+
+    def activate(self) -> None:
+        self.active = True

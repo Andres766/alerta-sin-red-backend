@@ -15,7 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 from app.application.services.zones import RiskSnapshot, ZoneRisk
-from app.domain.entities import AlertNotification, RiskAssessment, Subscriber, Zone
+from app.domain.entities import AlertNotification, RiskAssessment, Role, Subscriber, User, Zone
 from app.domain.value_objects import HazardType, RiskLevel
 
 
@@ -33,6 +33,13 @@ class SubscriptionIn(InputModel):
     accepts_data_policy: bool = Field(
         description="Autorización de tratamiento de datos (Ley 1581 de 2012)"
     )
+
+
+class UserCreateIn(InputModel):
+    email: EmailStr
+    # Política mínima: 12 caracteres (NIST SP 800-63B prioriza longitud sobre complejidad).
+    password: Annotated[str, StringConstraints(min_length=12, max_length=128)]
+    role: Role = Role.OPERATOR
 
 
 class LoginIn(InputModel):
@@ -149,6 +156,18 @@ class AlertOut(BaseModel):
     def of(cls, n: AlertNotification) -> AlertOut:
         return cls(id=n.id, zone_id=n.zone_id, level=n.level, channel=n.channel,
                    status=n.status.value, error=n.error, created_at=n.created_at)
+
+
+class UserOut(BaseModel):
+    id: UUID
+    email: str
+    role: Role
+    active: bool
+    created_at: datetime
+
+    @classmethod
+    def of(cls, u: User) -> UserOut:
+        return cls(id=u.id, email=u.email, role=u.role, active=u.active, created_at=u.created_at)
 
 
 class HealthOut(BaseModel):
