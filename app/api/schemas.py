@@ -181,6 +181,15 @@ class UserOut(BaseModel):
         return cls(id=u.id, email=u.email, role=u.role, active=u.active, created_at=u.created_at)
 
 
+class StatsOut(BaseModel):
+    zones: int
+    active_subscribers: int
+    zones_by_level: dict[str, int]
+    sms_sent_24h: int
+    sms_failed_24h: int
+    last_evaluation_at: datetime | None
+
+
 class HealthOut(BaseModel):
     status: str
     model_version: str

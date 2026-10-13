@@ -7,6 +7,7 @@ se elimina la inyección SQL por diseño.
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from geoalchemy2 import Geography, Geometry
@@ -290,6 +291,17 @@ class SqlAlertRepository(AlertRepository):
             .limit(limit)
         )
         return [_to_notification(r) for r in rows]
+
+    def count_since(self, since: datetime) -> dict[str, int]:
+        counts = {s.value: 0 for s in NotificationStatus}
+        rows = self._session.execute(
+            select(AlertNotificationModel.status, func.count())
+            .where(AlertNotificationModel.created_at >= since)
+            .group_by(AlertNotificationModel.status)
+        )
+        for status, total in rows:
+            counts[status.value] = total
+        return counts
 
 
 def _to_user(row: UserModel) -> User:

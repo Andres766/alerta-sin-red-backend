@@ -8,7 +8,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import ContainerDep, CurrentUser, UowDep, require_role
-from app.api.schemas import AlertOut, AssessmentOut, EvaluationOut, UserCreateIn, UserOut
+from app.api.schemas import (
+    AlertOut,
+    AssessmentOut,
+    EvaluationOut,
+    StatsOut,
+    UserCreateIn,
+    UserOut,
+)
 from app.domain.entities import Role
 
 router = APIRouter(
@@ -36,10 +43,14 @@ def recent_alerts(
     return [AlertOut.of(n) for n in uow.alerts.recent(limit)]
 
 
-@router.get("/stats")
-def stats(uow: UowDep) -> dict[str, int]:
-    return {"active_subscribers": uow.subscribers.count_active(),
-            "zones": len(uow.zones.list_all())}
+@router.get("/stats", response_model=StatsOut)
+def stats(uow: UowDep, container: ContainerDep) -> StatsOut:
+    s = container.dashboard(uow).stats()
+    return StatsOut(
+        zones=s.zones, active_subscribers=s.active_subscribers, zones_by_level=s.zones_by_level,
+        sms_sent_24h=s.sms_sent_24h, sms_failed_24h=s.sms_failed_24h,
+        last_evaluation_at=s.last_evaluation_at,
+    )
 
 
 # ---- Gestión de operadores (solo ADMIN) ---------------------------------------

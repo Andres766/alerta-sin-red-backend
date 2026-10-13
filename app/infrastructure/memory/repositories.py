@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
 
 from app.domain.entities import (
@@ -124,6 +125,13 @@ class InMemoryAlertRepository(AlertRepository):
 
     def recent(self, limit: int) -> list[AlertNotification]:
         return sorted(self._s.alerts, key=lambda a: a.created_at, reverse=True)[:limit]
+
+    def count_since(self, since: datetime) -> dict[str, int]:
+        counts = {s.value: 0 for s in NotificationStatus}
+        for a in self._s.alerts:
+            if a.created_at >= since:
+                counts[a.status.value] += 1
+        return counts
 
 
 class InMemoryUserRepository(UserRepository):

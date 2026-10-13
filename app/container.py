@@ -17,6 +17,7 @@ import httpx
 from app.application.event_bus import EventBus
 from app.application.services.alert_dispatcher import AlertDispatcher
 from app.application.services.auth import AuthService
+from app.application.services.dashboard import DashboardService
 from app.application.services.risk_assessment import RiskAssessmentService
 from app.application.services.subscriptions import SubscriptionService
 from app.application.services.users import UserManagementService
@@ -66,6 +67,10 @@ class Container:
         self.alert_policy = AlertPolicy(timedelta(hours=settings.alert_cooldown_hours))
         self.message_builder = AlertMessageBuilder()
         self.login_limiter = SlidingWindowRateLimiter(settings.login_rate_limit_per_minute, 60)
+        # Límite por cuenta: la IP se puede falsear con X-Forwarded-For, el correo atacado no.
+        self.account_login_limiter = SlidingWindowRateLimiter(
+            settings.login_attempts_per_account, 15 * 60
+        )
         self.subscribe_limiter = SlidingWindowRateLimiter(
             settings.subscribe_rate_limit_per_hour, 3600
         )
@@ -87,6 +92,9 @@ class Container:
 
     def zone_queries(self, uow: UnitOfWork) -> ZoneQueryService:
         return ZoneQueryService(uow)
+
+    def dashboard(self, uow: UnitOfWork) -> DashboardService:
+        return DashboardService(uow)
 
     def user_management(self, uow: UnitOfWork) -> UserManagementService:
         return UserManagementService(uow, self.hasher)

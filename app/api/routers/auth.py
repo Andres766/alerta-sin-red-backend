@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import ContainerDep, CurrentUser, UowDep, rate_limited
 from app.api.schemas import LoginIn, TokenOut, UserOut
@@ -15,6 +15,13 @@ router = APIRouter(prefix="/auth", tags=["autenticación"])
     dependencies=[Depends(rate_limited(lambda c: c.login_limiter))],
 )
 def login(body: LoginIn, uow: UowDep, container: ContainerDep) -> TokenOut:
+    # Segundo límite, por cuenta: frena la fuerza bruta distribuida o con IP falseada.
+    if not container.account_login_limiter.allow(f"login:{body.email.strip().lower()}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Demasiados intentos para esta cuenta, intente más tarde",
+            {"Retry-After": "900"},
+        )
     token = container.auth_service(uow).login(body.email, body.password)
     return TokenOut(access_token=token.token, expires_in=token.expires_in, role=token.role)
 

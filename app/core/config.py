@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # Documentación interactiva (/docs). Apagada en producción salvo que se pida.
     expose_docs: bool = False
     login_rate_limit_per_minute: int = Field(default=5, ge=1)
+    login_attempts_per_account: int = Field(default=10, ge=3)  # por cada 15 minutos
     subscribe_rate_limit_per_hour: int = Field(default=20, ge=1)
 
     # Usuario administrador inicial (solo lo usa el script de siembra)

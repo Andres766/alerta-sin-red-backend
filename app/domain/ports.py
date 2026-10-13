@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from types import TracebackType
 from uuid import UUID
 
@@ -81,6 +82,10 @@ class AlertRepository(ABC):
 
     @abstractmethod
     def recent(self, limit: int) -> list[AlertNotification]: ...
+
+    @abstractmethod
+    def count_since(self, since: datetime) -> dict[str, int]:
+        """Cantidad de notificaciones por estado (SENT/FAILED) desde ``since``."""
 
 
 class UserRepository(ABC):
