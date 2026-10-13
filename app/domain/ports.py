@@ -60,6 +60,9 @@ class SubscriberRepository(ABC):
     def add(self, subscriber: Subscriber) -> None: ...
 
     @abstractmethod
+    def get(self, subscriber_id: UUID) -> Subscriber | None: ...
+
+    @abstractmethod
     def find(self, zone_id: UUID, phone: PhoneNumber) -> Subscriber | None: ...
 
     @abstractmethod

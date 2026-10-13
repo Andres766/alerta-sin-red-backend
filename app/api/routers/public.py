@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.api.deps import ContainerDep, UowDep, rate_limited
 from app.api.schemas import (
     AssessmentOut,
+    CancelSubscriptionIn,
     HealthOut,
     NearbyZoneOut,
     SnapshotOut,
@@ -72,7 +73,21 @@ def zone_history(
     dependencies=[Depends(rate_limited(lambda c: c.subscribe_limiter))],
 )
 def subscribe(body: SubscriptionIn, uow: UowDep, container: ContainerDep) -> SubscriptionOut:
-    subscriber = container.subscription_service(uow).subscribe(
+    result = container.subscription_service(uow).subscribe(
         body.phone, body.zone_id, body.accepts_data_policy
     )
-    return SubscriptionOut.of(subscriber)
+    return SubscriptionOut.of(result)
+
+
+@router.post(
+    "/subscriptions/{subscription_id}/cancel",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["suscripciones"],
+    dependencies=[Depends(rate_limited(lambda c: c.subscribe_limiter))],
+)
+def cancel_subscription(
+    subscription_id: UUID, body: CancelSubscriptionIn, uow: UowDep, container: ContainerDep
+) -> Response:
+    """Baja de alertas SMS con el código que el celular recibió al suscribirse."""
+    container.subscription_service(uow).cancel(subscription_id, body.cancel_token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

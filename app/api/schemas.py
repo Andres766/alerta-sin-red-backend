@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
+from app.application.services.subscriptions import SubscriptionResult
 from app.application.services.zones import RiskSnapshot, ZoneRisk
 from app.domain.entities import AlertNotification, RiskAssessment, Role, Subscriber, User, Zone
 from app.domain.value_objects import HazardType, RiskLevel
@@ -33,6 +34,10 @@ class SubscriptionIn(InputModel):
     accepts_data_policy: bool = Field(
         description="Autorización de tratamiento de datos (Ley 1581 de 2012)"
     )
+
+
+class CancelSubscriptionIn(InputModel):
+    cancel_token: Annotated[str, StringConstraints(min_length=20, max_length=100)]
 
 
 class UserCreateIn(InputModel):
@@ -123,11 +128,17 @@ class SubscriptionOut(BaseModel):
     zone_id: UUID
     phone_masked: str
     active: bool
+    cancel_token: str | None = Field(
+        default=None,
+        description="Código de baja. Se entrega una sola vez: el dispositivo debe guardarlo.",
+    )
     message: str = "Suscripción registrada. Recibirá SMS si el riesgo de su zona es alto."
 
     @classmethod
-    def of(cls, s: Subscriber) -> SubscriptionOut:
-        return cls(id=s.id, zone_id=s.zone_id, phone_masked=s.phone.masked(), active=s.active)
+    def of(cls, result: SubscriptionResult) -> SubscriptionOut:
+        s: Subscriber = result.subscriber
+        return cls(id=s.id, zone_id=s.zone_id, phone_masked=s.phone.masked(), active=s.active,
+                   cancel_token=result.cancel_token)
 
 
 class TokenOut(BaseModel):

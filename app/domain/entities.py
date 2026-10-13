@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -113,6 +116,8 @@ class Subscriber:
     active: bool = True
     created_at: datetime = field(default_factory=utcnow)
     id: UUID = field(default_factory=uuid4)
+    # Huella SHA-256 del código de cancelación; el código en claro solo lo tiene el celular.
+    cancel_token_hash: str | None = None
 
     @classmethod
     def subscribe(cls, zone_id: UUID, phone: PhoneNumber, consent: bool) -> Subscriber:
@@ -120,6 +125,30 @@ class Subscriber:
         if consent is not True:
             raise ConsentRequiredError("Se requiere autorización para el tratamiento de datos")
         return cls(zone_id=zone_id, phone=phone, consent_at=utcnow())
+
+    def issue_cancel_token(self) -> str:
+        """Genera un código de 256 bits para darse de baja y guarda solo su huella.
+
+        Al ser aleatorio y de alta entropía, SHA-256 basta (no hace falta un hash
+        lento como Argon2, que se usa para contraseñas elegidas por personas).
+        """
+        token = secrets.token_urlsafe(32)
+        self.cancel_token_hash = _sha256(token)
+        return token
+
+    def can_be_cancelled_with(self, token: str) -> bool:
+        if not self.cancel_token_hash or not token:
+            return False
+        return hmac.compare_digest(self.cancel_token_hash, _sha256(token))
+
+    def cancel(self) -> None:
+        """Baja: deja de recibir SMS (revoca la autorización de tratamiento)."""
+        self.active = False
+        self.cancel_token_hash = None
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 class NotificationStatus(StrEnum):

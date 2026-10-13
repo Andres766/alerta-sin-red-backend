@@ -187,7 +187,12 @@ class SqlSubscriberRepository(SubscriberRepository):
             consent_at=row.consent_at,
             active=row.active,
             created_at=row.created_at,
+            cancel_token_hash=row.cancel_token_hash,
         )
+
+    def get(self, subscriber_id: UUID) -> Subscriber | None:
+        row = self._session.get(SubscriberModel, subscriber_id)
+        return self._to_entity(row) if row else None
 
     def add(self, subscriber: Subscriber) -> None:
         self._session.merge(
@@ -199,6 +204,7 @@ class SqlSubscriberRepository(SubscriberRepository):
                 consent_at=subscriber.consent_at,
                 active=subscriber.active,
                 created_at=subscriber.created_at,
+                cancel_token_hash=subscriber.cancel_token_hash,
             )
         )
 

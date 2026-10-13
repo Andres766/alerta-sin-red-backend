@@ -91,6 +91,9 @@ class InMemorySubscriberRepository(SubscriberRepository):
         with self._s.lock:
             self._s.subscribers[subscriber.id] = subscriber
 
+    def get(self, subscriber_id: UUID) -> Subscriber | None:
+        return self._s.subscribers.get(subscriber_id)
+
     def find(self, zone_id: UUID, phone: PhoneNumber) -> Subscriber | None:
         return next(
             (s for s in self._s.subscribers.values() if s.zone_id == zone_id and s.phone == phone),

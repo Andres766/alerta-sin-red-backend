@@ -84,6 +84,7 @@ class SubscriberModel(Base):
     zone_id: Mapped[UUID] = mapped_column(ForeignKey("zones.id", ondelete="CASCADE"))
     phone_ciphertext: Mapped[str] = mapped_column(String(255))  # Fernet
     phone_index: Mapped[str] = mapped_column(String(64), index=True)  # HMAC-SHA256
+    cancel_token_hash: Mapped[str | None] = mapped_column(String(64))  # SHA-256
     consent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

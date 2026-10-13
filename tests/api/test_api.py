@@ -95,3 +95,12 @@ def test_flujo_completo_evaluacion_y_alertas(client, admin_token, sms):
 
     history = client.get(f"{API}/zones/{mocoa}/history").json()
     assert len(history) == 1
+
+
+def test_baja_de_suscripcion_por_api(client):
+    created = client.post(f"{API}/subscriptions", json={
+        "phone": "3001112233", "zone_id": zone_id(client), "accepts_data_policy": True}).json()
+    url = f"{API}/subscriptions/{created['id']}/cancel"
+    assert client.post(url, json={"cancel_token": "x" * 30}).status_code == 404
+    assert client.post(url, json={"cancel_token": created["cancel_token"]}).status_code == 204
+    assert client.post(url, json={"cancel_token": created["cancel_token"]}).status_code == 404

@@ -23,3 +23,17 @@ def init_db(engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     Base.metadata.create_all(engine)
+    _apply_additive_migrations(engine)
+
+
+# create_all no altera tablas existentes: las columnas nuevas se agregan aquí de
+# forma idempotente para no perder datos en bases ya desplegadas (p. ej. Render).
+_ADDITIVE_MIGRATIONS = (
+    "ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS cancel_token_hash VARCHAR(64)",
+)
+
+
+def _apply_additive_migrations(engine: Engine) -> None:
+    with engine.begin() as conn:
+        for statement in _ADDITIVE_MIGRATIONS:
+            conn.execute(text(statement))
