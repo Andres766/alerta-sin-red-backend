@@ -74,3 +74,64 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if self._hsts:
             h["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         return response
+
+
+class BodySizeLimitMiddleware:
+    """Rechaza con 413 los cuerpos de petición mayores que ``max_bytes``.
+
+    Middleware ASGI puro. Si llega Content-Length se decide de inmediato; si el
+    cliente envía el cuerpo por partes sin declararlo, se lee aquí hasta el límite
+    y luego se entrega intacto a la aplicación. Evita que un cuerpo enorme agote
+    la memoria de una instancia pequeña.
+    """
+
+    def __init__(self, app, max_bytes: int) -> None:  # type: ignore[no-untyped-def]
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):  # type: ignore[no-untyped-def]
+        if scope["type"] != "http" or scope["method"] in ("GET", "HEAD", "OPTIONS"):
+            return await self.app(scope, receive, send)
+
+        declared = dict(scope.get("headers", [])).get(b"content-length")
+        if declared is not None:
+            if not declared.isdigit() or int(declared) > self.max_bytes:
+                return await self._reject(send)
+            return await self.app(scope, receive, send)
+
+        # Sin Content-Length: se lee por partes, contando, hasta el final o el límite.
+        chunks: list[bytes] = []
+        size = 0
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                return await self.app(scope, receive, send)  # desconexión del cliente
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > self.max_bytes:
+                return await self._reject(send)
+            chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+
+        body = b"".join(chunks)
+        delivered = False
+
+        async def replay():  # type: ignore[no-untyped-def]
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+    async def _reject(self, send) -> None:  # type: ignore[no-untyped-def]
+        body = b'{"code":"payload_too_large","detail":"La solicitud es demasiado grande"}'
+        await send({
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [(b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode())],
+        })
+        await send({"type": "http.response.body", "body": body})

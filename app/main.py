@@ -15,7 +15,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.errors import register_error_handlers
-from app.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.api.middleware import (
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.api.routers import admin, auth, public
 from app.container import Container, build_container
 from app.core.config import Settings, get_settings
@@ -85,6 +89,8 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     if settings.is_production:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
+    # Ninguna petición legítima de esta API supera unos pocos KB.
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
     # Se agrega al final para que sea el más externo y mida toda la petición.
     app.add_middleware(RequestContextMiddleware)
 

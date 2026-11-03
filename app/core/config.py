@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     phone_index_key: SecretStr  # clave HMAC para el índice ciego de teléfonos
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
     allowed_hosts: list[str] = ["localhost", "127.0.0.1", "backend"]
+    max_request_body_bytes: int = Field(default=64 * 1024, ge=1024)
     # Documentación interactiva (/docs). Apagada en producción salvo que se pida.
     expose_docs: bool = False
     login_rate_limit_per_minute: int = Field(default=5, ge=1)
