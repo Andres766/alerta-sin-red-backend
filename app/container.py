@@ -19,6 +19,7 @@ from app.application.services.alert_dispatcher import AlertDispatcher
 from app.application.services.audit import AuditTrail
 from app.application.services.auth import AuthService
 from app.application.services.dashboard import DashboardService
+from app.application.services.reports import AssessmentReportService
 from app.application.services.risk_assessment import RiskAssessmentService
 from app.application.services.sms_test import SmsTestService
 from app.application.services.subscriptions import SubscriptionService
@@ -106,6 +107,9 @@ class Container:
 
     def audit(self, uow: UnitOfWork) -> AuditTrail:
         return AuditTrail(uow)
+
+    def reports(self, uow: UnitOfWork) -> AssessmentReportService:
+        return AssessmentReportService(uow)
 
     def sms_test(self, uow: UnitOfWork) -> SmsTestService:
         return SmsTestService(uow, self.sms, AuditTrail(uow))

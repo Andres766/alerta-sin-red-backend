@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import ContainerDep, CurrentUser, UowDep, rate_limited, require_role
 from app.api.schemas import (
@@ -151,4 +151,24 @@ def send_test_sms(
         success=result.success, channel=container.sms.channel,
         phone_masked=PhoneNumber.parse(body.phone).masked(),
         provider_message_id=result.provider_message_id, error=result.error,
+    )
+
+
+@router.get(
+    "/assessments.csv",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}, "description": "Historial en CSV"}},
+)
+def export_assessments(
+    uow: UowDep, container: ContainerDep, days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> Response:
+    """Historial de evaluaciones de todas las zonas (para informes y análisis en Excel)."""
+    content = container.reports(uow).csv_since_days(days)
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="evaluaciones-ultimos-{days}-dias.csv"',
+            "Cache-Control": "no-store",
+        },
     )

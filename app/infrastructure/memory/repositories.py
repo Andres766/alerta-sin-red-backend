@@ -86,6 +86,10 @@ class InMemoryRiskAssessmentRepository(RiskAssessmentRepository):
         rows = [a for a in self._s.assessments if a.zone_id == zone_id]
         return sorted(rows, key=lambda a: a.assessed_at, reverse=True)[:limit]
 
+    def since(self, moment: datetime, limit: int) -> list[RiskAssessment]:
+        rows = [a for a in self._s.assessments if a.assessed_at >= moment]
+        return sorted(rows, key=lambda a: a.assessed_at)[:limit]
+
 
 class InMemorySubscriberRepository(SubscriberRepository):
     def __init__(self, store: InMemoryStore) -> None:

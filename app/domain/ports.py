@@ -62,6 +62,10 @@ class RiskAssessmentRepository(ABC):
     @abstractmethod
     def history(self, zone_id: UUID, limit: int) -> list[RiskAssessment]: ...
 
+    @abstractmethod
+    def since(self, moment: datetime, limit: int) -> list[RiskAssessment]:
+        """Evaluaciones de todas las zonas desde ``moment``, en orden cronológico."""
+
 
 class SubscriberRepository(ABC):
     @abstractmethod

@@ -174,6 +174,15 @@ class SqlRiskAssessmentRepository(RiskAssessmentRepository):
         )
         return [_to_assessment(r) for r in self._session.scalars(stmt)]
 
+    def since(self, moment: datetime, limit: int) -> list[RiskAssessment]:
+        stmt = (
+            select(RiskAssessmentModel)
+            .where(RiskAssessmentModel.assessed_at >= moment)
+            .order_by(RiskAssessmentModel.assessed_at)
+            .limit(limit)
+        )
+        return [_to_assessment(r) for r in self._session.scalars(stmt)]
+
 
 # --------------------------------------------------------------------------- #
 # Suscriptores (teléfono cifrado + índice ciego)
