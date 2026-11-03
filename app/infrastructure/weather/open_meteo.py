@@ -11,6 +11,8 @@ Traduce las respuestas JSON de dos APIs públicas a un objeto de dominio
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from statistics import fmean
 
@@ -26,10 +28,23 @@ logger = logging.getLogger(__name__)
 class OpenMeteoWeatherProvider(WeatherProvider):
     SOURCE = "open-meteo"
 
-    def __init__(self, forecast_url: str, flood_url: str, client: httpx.Client) -> None:
+    # Estados que suelen ser temporales: vale la pena reintentar.
+    RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+    MAX_ATTEMPTS = 3
+    BASE_DELAY_SECONDS = 0.5
+    MAX_RETRY_AFTER_SECONDS = 5.0
+
+    def __init__(
+        self,
+        forecast_url: str,
+        flood_url: str,
+        client: httpx.Client,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self._forecast_url = forecast_url
         self._flood_url = flood_url
         self._client = client
+        self._sleep = sleep
 
     def get_conditions(self, point: Coordinates) -> WeatherConditions:
         hourly = self._fetch_hourly(point)
@@ -100,9 +115,35 @@ class OpenMeteoWeatherProvider(WeatherProvider):
             return 1.0
 
     def _get_json(self, url: str, params: dict) -> dict:
-        try:
-            response = self._client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise WeatherUnavailableError(f"Open-Meteo no respondió: {type(exc).__name__}") from exc
+        """GET con reintentos ante 429/5xx y espera exponencial (0.5 s, 1 s, ...).
+
+        Si el servidor envía Retry-After se respeta, con un tope para no dejar
+        la evaluación de las demás zonas esperando demasiado.
+        """
+        for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            try:
+                response = self._client.get(url, params=params)
+                if (
+                    response.status_code in self.RETRYABLE_STATUS
+                    and attempt < self.MAX_ATTEMPTS
+                ):
+                    delay = self._retry_delay(response, attempt)
+                    logger.info(
+                        "Open-Meteo respondió %d; reintento %d en %.1f s",
+                        response.status_code, attempt, delay,
+                    )
+                    self._sleep(delay)
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except (httpx.HTTPError, ValueError) as exc:
+                raise WeatherUnavailableError(
+                    f"Open-Meteo no respondió: {type(exc).__name__}"
+                ) from exc
+        raise WeatherUnavailableError("Open-Meteo no respondió tras reintentar")  # inalcanzable
+
+    def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
+        retry_after = response.headers.get("Retry-After", "")
+        if retry_after.isdigit():
+            return min(float(retry_after), self.MAX_RETRY_AFTER_SECONDS)
+        return self.BASE_DELAY_SECONDS * 2 ** (attempt - 1)
