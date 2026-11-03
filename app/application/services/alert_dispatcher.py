@@ -6,7 +6,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
-from app.domain.entities import AlertNotification, NotificationStatus
+from app.domain.entities import AlertNotification, NotificationKind, NotificationStatus
 from app.domain.events import RiskAssessed
 from app.domain.policies import AlertMessageBuilder, AlertPolicy
 from app.domain.ports import SmsGateway, UnitOfWork
@@ -32,10 +32,16 @@ class AlertDispatcher:
     def __call__(self, event: RiskAssessed) -> list[AlertNotification]:
         zone, assessment = event.zone, event.assessment
         last_sent = self._uow.alerts.last_sent_for_zone(zone.id)
-        if not self._policy.should_alert(assessment, last_sent, self._clock()):
+        if self._policy.should_alert(assessment, last_sent, self._clock()):
+            kind, message = NotificationKind.ALERT, self._messages.build(zone, assessment)
+        elif self._policy.should_send_all_clear(assessment, last_sent):
+            kind, message = (
+                NotificationKind.ALL_CLEAR,
+                self._messages.build_all_clear(zone, assessment),
+            )
+        else:
             return []
 
-        message = self._messages.build(zone, assessment)
         notifications: list[AlertNotification] = []
         for subscriber in self._uow.subscribers.active_for_zone(zone.id):
             result = self._sms.send(subscriber.phone, message)
@@ -48,12 +54,13 @@ class AlertDispatcher:
                 status=NotificationStatus.SENT if result.success else NotificationStatus.FAILED,
                 provider_message_id=result.provider_message_id,
                 error=result.error,
+                kind=kind,
             )
             self._uow.alerts.add(notification)
             notifications.append(notification)
 
         self._uow.commit()
         sent = sum(n.status is NotificationStatus.SENT for n in notifications)
-        logger.info("Alerta %s para %s: %d/%d SMS enviados",
+        logger.info("%s %s para %s: %d/%d SMS enviados", kind.value,
                     assessment.level.value, zone.name, sent, len(notifications))
         return notifications

@@ -157,6 +157,7 @@ class EvaluationOut(BaseModel):
 class AlertOut(BaseModel):
     id: UUID
     zone_id: UUID
+    kind: str
     level: RiskLevel
     channel: str
     status: str
@@ -165,7 +166,8 @@ class AlertOut(BaseModel):
 
     @classmethod
     def of(cls, n: AlertNotification) -> AlertOut:
-        return cls(id=n.id, zone_id=n.zone_id, level=n.level, channel=n.channel,
+        return cls(id=n.id, zone_id=n.zone_id, kind=n.kind.value, level=n.level,
+                   channel=n.channel,
                    status=n.status.value, error=n.error, created_at=n.created_at)
 
 

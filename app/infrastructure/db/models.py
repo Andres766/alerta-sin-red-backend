@@ -105,6 +105,7 @@ class AlertNotificationModel(Base):
     status: Mapped[NotificationStatus] = mapped_column(
         _enum(NotificationStatus, "notification_status")
     )
+    kind: Mapped[str] = mapped_column(String(20), default="ALERT", server_default="ALERT")
     provider_message_id: Mapped[str | None] = mapped_column(String(120))
     error: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unicodedata
 from datetime import datetime, timedelta
 
-from app.domain.entities import AlertNotification, RiskAssessment, Zone
+from app.domain.entities import AlertNotification, NotificationKind, RiskAssessment, Zone
 from app.domain.value_objects import HazardType, RiskLevel
 
 
@@ -14,6 +14,7 @@ class AlertPolicy:
 
     Evita la "fatiga de alertas": no se repite el SMS de una zona dentro del
     periodo de enfriamiento, salvo que el riesgo haya escalado de nivel.
+    Cuando el riesgo baja después de una alerta, avisa una vez que terminó.
     """
 
     def __init__(self, cooldown: timedelta) -> None:
@@ -24,11 +25,21 @@ class AlertPolicy:
     ) -> bool:
         if not assessment.requires_alert:
             return False
-        if last_sent is None:
-            return True
+        if last_sent is None or last_sent.kind is NotificationKind.ALL_CLEAR:
+            return True  # primera alerta, o vuelve a subir tras un fin de alerta
         if assessment.level.severity > last_sent.level.severity:
             return True
         return now - last_sent.created_at >= self._cooldown
+
+    def should_send_all_clear(
+        self, assessment: RiskAssessment, last_sent: AlertNotification | None
+    ) -> bool:
+        """El riesgo bajó de alto y lo último enviado fue una alerta (no un fin de alerta)."""
+        return (
+            not assessment.requires_alert
+            and last_sent is not None
+            and last_sent.kind is NotificationKind.ALERT
+        )
 
 
 class AlertMessageBuilder:
@@ -63,6 +74,17 @@ class AlertMessageBuilder:
             text = self._to_gsm7(
                 header + body.replace(zone.name, short_name) + footer
             )[: self.MAX_LENGTH]
+        return text
+
+    def build_all_clear(self, zone: Zone, assessment: RiskAssessment) -> str:
+        text = self._to_gsm7(
+            f"AlertaSinRed: termino la alerta en {zone.name}. Riesgo actual: "
+            f"{assessment.level.label}. Siga atento a nuevos avisos. Linea 123"
+        )
+        if len(text) > self.MAX_LENGTH:
+            overflow = len(text) - self.MAX_LENGTH
+            short_name = self._to_gsm7(zone.name)[: max(8, len(zone.name) - overflow - 1)]
+            text = text.replace(self._to_gsm7(zone.name), short_name)[: self.MAX_LENGTH]
         return text
 
     @staticmethod

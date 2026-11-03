@@ -156,6 +156,11 @@ class NotificationStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class NotificationKind(StrEnum):
+    ALERT = "ALERT"  # el riesgo llegó a alto o muy alto
+    ALL_CLEAR = "ALL_CLEAR"  # el riesgo volvió a bajar: fin de la alerta
+
+
 @dataclass(slots=True)
 class AlertNotification:
     """Registro auditable de cada SMS intentado."""
@@ -170,6 +175,7 @@ class AlertNotification:
     error: str | None = None
     created_at: datetime = field(default_factory=utcnow)
     id: UUID = field(default_factory=uuid4)
+    kind: NotificationKind = NotificationKind.ALERT
 
 
 class Role(StrEnum):

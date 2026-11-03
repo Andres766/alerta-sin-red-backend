@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.security import PhoneCipher
 from app.domain.entities import (
     AlertNotification,
+    NotificationKind,
     NotificationStatus,
     RiskAssessment,
     Subscriber,
@@ -249,6 +250,7 @@ def _to_notification(row: AlertNotificationModel) -> AlertNotification:
         provider_message_id=row.provider_message_id,
         error=row.error,
         created_at=row.created_at,
+        kind=NotificationKind(row.kind),
     )
 
 
@@ -266,6 +268,7 @@ class SqlAlertRepository(AlertRepository):
                 level=n.level,
                 channel=n.channel,
                 status=n.status,
+                kind=n.kind.value,
                 provider_message_id=n.provider_message_id,
                 error=(n.error or "")[:255] or None,
                 created_at=n.created_at,

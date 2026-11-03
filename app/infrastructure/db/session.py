@@ -44,6 +44,8 @@ def init_db(engine: Engine) -> None:
 # forma idempotente para no perder datos en bases ya desplegadas (p. ej. Render).
 _ADDITIVE_MIGRATIONS = (
     "ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS cancel_token_hash VARCHAR(64)",
+    "ALTER TABLE alert_notifications "
+    "ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'ALERT'",
 )
 
 
