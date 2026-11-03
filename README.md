@@ -57,6 +57,7 @@ con el número enmascarado.
 |---|---|
 | `python -m app.cli gen-keys` | Genera `JWT_SECRET`, `PHONE_ENCRYPTION_KEY` y `PHONE_INDEX_KEY` |
 | `python -m app.cli init-db` | Crea PostGIS, tablas y aplica migraciones pendientes |
+| `python -m app.cli migrations` | Estado de cada migración del esquema (aplicada o pendiente) |
 | `python -m app.cli seed` | Zonas piloto y usuario administrador (idempotente) |
 | `python -m app.cli evaluate` | Ejecuta el modelo sobre todas las zonas y envía los SMS |
 | `python -m ml.train` | Reentrena el modelo (datos sintéticos, fase 1) |
@@ -67,24 +68,35 @@ con el número enmascarado.
 ```bash
 pytest            # unitarias, de servicios y de API (repositorios en memoria)
 ruff check .      # estilo, imports y reglas de seguridad (Bandit)
+
+# Integración contra PostgreSQL + PostGIS (la base indicada se vacía: use una de pruebas)
+TEST_DATABASE_URL=postgresql://alerta:alerta@localhost:5432/alerta_test pytest tests/integration
 ```
 
 ## Endpoints principales (`/api/v1`)
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| GET | `/health` | Público | Estado, versión del modelo y proveedores |
+| GET | `/health` | Público | Vida: estado, versión del modelo y proveedores |
+| GET | `/health/ready` | Público | Disponibilidad: verifica la base de datos (503 si falla) |
+| GET | `/model` | Público | Ficha técnica del modelo de IA: métricas, variables y limitaciones |
 | GET | `/risk/snapshot` | Público | Todas las zonas con su última evaluación (lo que la PWA guarda offline) |
 | GET | `/zones/nearby?lat=&lon=&radius_km=` | Público | Zonas cercanas (consulta espacial PostGIS) |
+| GET | `/zones/{id}` | Público | Una zona con su última evaluación |
 | GET | `/zones/{id}/history` | Público | Evaluaciones recientes de una zona |
 | POST | `/subscriptions` | Público | Suscribe un celular a las alertas SMS de una zona |
 | POST | `/subscriptions/{id}/cancel` | Código de baja | Da de baja la suscripción |
 | POST | `/auth/login` | Público | Inicio de sesión de operadores (JWT) |
 | GET | `/auth/me` | Operador | Datos de la sesión actual |
+| POST | `/auth/change-password` | Operador | Cambia la clave propia y cierra las demás sesiones |
 | POST | `/admin/evaluations` | Operador | Ejecuta el modelo de IA y despacha SMS |
 | GET | `/admin/alerts` · `/admin/stats` | Operador | SMS enviados e indicadores |
 | GET/POST | `/admin/users` | Administrador | Lista y crea cuentas |
 | POST | `/admin/users/{id}/activate` · `/deactivate` | Administrador | Activa o desactiva cuentas |
+| GET | `/admin/assessments.csv?days=` | Operador | Historial de evaluaciones en CSV |
+| POST | `/admin/zones` · PATCH `/admin/zones/{id}` | Administrador | Registra o actualiza zonas |
+| POST | `/admin/sms/test` | Administrador | SMS de prueba de la pasarela (máx. 5 por hora) |
+| GET | `/admin/audit` | Administrador | Bitácora de auditoría |
 
 ## Despliegue
 

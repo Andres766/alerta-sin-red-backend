@@ -123,11 +123,17 @@ frontend/src/
 | **Value Object** | `PhoneNumber`, `Coordinates`, `RiskFeatures` | Inmutables y auto-validados |
 | **Outbox** | `OutboxRepository` + `OutboxProcessor` (PWA) | No perder acciones hechas sin red |
 | **DTO** | `api/schemas.py` | Separar el contrato HTTP del modelo de dominio |
+| **Decorator** | `CachedWeatherProvider` envuelve cualquier `WeatherProvider` | Agregar caché sin modificar el proveedor ni los casos de uso |
+| **Exclusión mutua (Lock)** | `JobLock`: `InProcessJobLock`, `PostgresAdvisoryJobLock` | Que la evaluación completa no corra dos veces a la vez, incluso con varias instancias |
+| **Middleware / Chain of Responsibility** | `RequestContextMiddleware`, `BodySizeLimitMiddleware`, `SecurityHeadersMiddleware` | Preocupaciones transversales (trazabilidad, límites, cabeceras) fuera de los casos de uso |
 
 **Encapsulamiento:** las reglas viven en la entidad que las conoce: `Subscriber.subscribe()`
 exige consentimiento; `Zone.build_features()` neutraliza el caudal de ríos en zonas de
 solo deslizamiento; `RiskLevel.requires_sms` decide qué niveles alertan;
-`PhoneNumber.__str__` nunca imprime el número completo.
+`PhoneNumber.__str__` nunca imprime el número completo; `Subscriber.issue_cancel_token()`
+guarda solo la huella del código de baja; `User.accepts_token_issued_at()` invalida las
+sesiones anteriores a un cambio de contraseña; `AlertPolicy` decide entre alerta, fin de
+alerta o silencio.
 
 **Polimorfismo:** `AlertDispatcher` llama a `sms.send()` sin saber si detrás hay Twilio,
 un celular Android o la consola.
@@ -266,6 +272,7 @@ erDiagram
     uuid zone_id FK
     varchar phone_ciphertext "Fernet (AES + HMAC)"
     varchar phone_index "HMAC-SHA256, UNIQUE con zone_id"
+    varchar cancel_token_hash "SHA-256 del código de baja"
     timestamptz consent_at "Ley 1581/2012"
     bool active
   }
@@ -277,6 +284,7 @@ erDiagram
     enum level
     varchar channel
     enum status "SENT|FAILED"
+    varchar kind "ALERT|ALL_CLEAR"
     varchar provider_message_id
   }
   USERS {
@@ -284,6 +292,20 @@ erDiagram
     varchar email UK
     varchar password_hash "Argon2id"
     enum role "ADMIN|OPERATOR"
+    timestamptz password_changed_at "invalida tokens anteriores"
+  }
+  AUDIT_LOG {
+    uuid id PK
+    varchar actor
+    varchar action "LOGIN_FAILED, USER_CREATED, ZONE_UPDATED…"
+    varchar target
+    varchar details
+    timestamptz created_at
+  }
+  SCHEMA_MIGRATIONS {
+    int version PK
+    varchar description
+    timestamptz applied_at
   }
 ```
 
@@ -300,16 +322,16 @@ Consultas espaciales destacadas:
 
 | Riesgo | Control implementado |
 |---|---|
-| **A01 Control de acceso** | JWT + RBAC (`require_role`), endpoints admin separados, `/admin` nunca se cachea en el SW |
+| **A01 Control de acceso** | JWT + RBAC (`require_role`) con el rol vigente en la base en cada petición; una cuenta desactivada pierde el acceso de inmediato; `/admin` nunca se cachea en el SW; la baja de una suscripción exige el código que solo tiene el dispositivo |
 | **A02 Fallas criptográficas** | Contraseñas con **Argon2id**; teléfonos **cifrados en reposo** (Fernet) + índice ciego HMAC-SHA256; secretos solo por variables de entorno; HSTS en producción |
 | **A03 Inyección** | Consultas parametrizadas del ORM (sin SQL concatenado); DTOs con `extra="forbid"`, longitudes y patrones; CSP estricta en el frontend (sin scripts inline) |
-| **A04 Diseño inseguro** | Suscripción idempotente que no revela si un número existía; enfriamiento de alertas contra "fatiga"; consentimiento obligatorio |
-| **A05 Configuración** | La app no arranca con secretos débiles o CORS `*` en producción; `/docs` deshabilitado en producción; contenedores sin root, sistema de archivos de solo lectura, `no-new-privileges` |
-| **A07 Autenticación** | Rate limiting en login (5/min por IP) y suscripciones; mensaje genérico de error; verificación con hash señuelo para evitar enumeración por tiempo; JWT con `exp`, `iss`, lista fija de algoritmos (bloquea `alg=none`) |
+| **A04 Diseño inseguro** | Suscripción idempotente; una suscripción activa no emite códigos de baja nuevos; enfriamiento de alertas contra "fatiga"; consentimiento obligatorio; siempre queda un administrador activo; SMS de prueba limitado a 5 por hora |
+| **A05 Configuración** | La app no arranca con secretos débiles o CORS `*` en producción; `/docs` deshabilitado en producción; contenedores sin root, sistema de archivos de solo lectura, `no-new-privileges`; cuerpos de petición limitados a 64 KB (413); tiempos límite de conexión a la base |
+| **A07 Autenticación** | Rate limiting en login por IP (5/min) **y por cuenta** (10 cada 15 min, no se evade falseando la IP); mensaje genérico de error; hash señuelo contra enumeración por tiempo; JWT con `exp`, `iss` y lista fija de algoritmos (bloquea `alg=none`); cambio de contraseña que cierra las demás sesiones; hashes Argon2 actualizados al iniciar sesión si sus parámetros quedaron antiguos |
 | **A08 Integridad de software/datos** | El modelo de IA solo se carga si su **SHA-256** coincide con los metadatos (pickle puede ejecutar código) y si el orden de variables es el esperado |
-| **A09 Registro y monitoreo** | Errores internos se registran en servidor; el cliente nunca recibe trazas; teléfonos siempre enmascarados en logs |
+| **A09 Registro y monitoreo** | **Bitácora de auditoría** (inicios de sesión exitosos y fallidos, cuentas, zonas, evaluaciones, SMS de prueba); identificador `X-Request-ID` en cada petición y en cada línea de log; el cliente nunca recibe trazas; teléfonos siempre enmascarados; el log de acceso omite la consulta (puede llevar la ubicación) |
 | **A10 SSRF** | URLs de servicios externos fijas por configuración; el usuario nunca controla a qué host se conecta el servidor |
-| **Privacidad** | Token de operador solo en memoria (no `localStorage`); la ubicación del usuario no se almacena |
+| **Privacidad** | Token de operador solo en memoria (no `localStorage`); la ubicación del usuario no se almacena; el CSV exportado neutraliza fórmulas (inyección de CSV) |
 
 ---
 
@@ -337,10 +359,17 @@ producción y permite que el Service Worker intercepte las peticiones a la API.
 
 ## 9. Calidad y pruebas
 
-- **Backend:** 51 pruebas (pytest) — dominio, casos de uso, seguridad (JWT alterado,
-  `alg=none`, token expirado, cifrado, rate limiting), integridad del modelo, adaptador de
-  Open-Meteo con transporte simulado y API de extremo a extremo. Linter `ruff` con reglas
-  de seguridad (Bandit).
+- **Backend:** 138 pruebas (pytest).
+  - 132 unitarias y de API (repositorios en memoria): dominio, políticas de alerta y fin de
+    alerta, casos de uso, seguridad (JWT alterado, `alg=none`, token expirado, sesiones
+    cerradas al cambiar la clave, cifrado, rate limiting por IP y por cuenta, límite de
+    tamaño), integridad del modelo, caché y reintentos del clima, candado de evaluación,
+    bitácora y exportación CSV.
+  - 6 de integración contra PostgreSQL + PostGIS reales (`tests/integration`, requieren
+    `TEST_DATABASE_URL`): consulta espacial, `DISTINCT ON`, cifrado en reposo,
+    migraciones y flujo completo de alertas.
+  - Linter `ruff` con reglas de seguridad (Bandit). GitHub Actions ejecuta todo en cada
+    push, con un servicio PostGIS, y construye la imagen Docker.
 - **Frontend:** 11 pruebas (Vitest) de la lógica offline con IndexedDB simulado y una red
   que se puede "cortar": caché, outbox, reintentos y errores permanentes. TypeScript en
   modo estricto.
@@ -353,7 +382,13 @@ producción y permite que el Service Worker intercepte las peticiones a la API.
 2. Calibración por climatología local (anomalías de lluvia) para la región pacífica.
 3. Cargar la capa oficial de susceptibilidad del SGC (shapefile → polígonos PostGIS) y
    calcular la susceptibilidad por intersección espacial (`ST_Intersects`).
-4. Verificación del número por OTP antes de activar la suscripción, y baja por SMS ("BAJA").
-5. Notificaciones push (Web Push) como canal adicional suscrito al `EventBus`.
-6. Migraciones versionadas con Alembic y rate limiting distribuido en Redis.
+4. Verificación del número por OTP antes de activar la suscripción, y baja respondiendo
+   "BAJA" por SMS (hoy la baja se hace desde el dispositivo con su código).
+5. Notificaciones push (Web Push) desde el servidor como canal adicional del `EventBus`.
+6. Rate limiting distribuido en Redis cuando haya más de una instancia de la API.
 7. Fuente oficial IDEAM (datos.gov.co / Socrata) como `WeatherProvider` alternativo.
+
+**Ya implementado desde el avance:** gestión de operadores y de zonas, baja de
+suscripciones, SMS de fin de alerta, bitácora de auditoría, cambio de contraseña,
+migraciones versionadas, caché y reintentos del clima, ficha pública del modelo, CI y
+pruebas de integración.
