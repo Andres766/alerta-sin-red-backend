@@ -16,7 +16,11 @@ from app.api.schemas import (
     StatsOut,
     UserCreateIn,
     UserOut,
+    ZoneCreateIn,
+    ZoneOut,
+    ZoneUpdateIn,
 )
+from app.application.services.zone_admin import NewZone, ZoneChanges
 from app.domain.entities import AuditAction, Role
 
 router = APIRouter(
@@ -104,3 +108,27 @@ def audit_log(
                       details=e.details, created_at=e.created_at)
         for e in container.audit(uow).recent(limit)
     ]
+
+
+# ---- Zonas monitoreadas (solo ADMIN) ------------------------------------------
+
+
+@router.post(
+    "/zones", response_model=ZoneOut, status_code=status.HTTP_201_CREATED,
+    dependencies=admin_only,
+)
+def create_zone(
+    body: ZoneCreateIn, me: CurrentUser, uow: UowDep, container: ContainerDep
+) -> ZoneOut:
+    """Registra una zona nueva; entra en la próxima evaluación automática."""
+    zone = container.zone_admin(uow).create(NewZone(**body.model_dump()), me)
+    return ZoneOut.of(zone)
+
+
+@router.patch("/zones/{zone_id}", response_model=ZoneOut, dependencies=admin_only)
+def update_zone(
+    zone_id: UUID, body: ZoneUpdateIn, me: CurrentUser, uow: UowDep, container: ContainerDep
+) -> ZoneOut:
+    """Actualiza la capa estática de una zona (tipo de amenaza, susceptibilidad, pendiente)."""
+    zone = container.zone_admin(uow).update(zone_id, ZoneChanges(**body.model_dump()), me)
+    return ZoneOut.of(zone)

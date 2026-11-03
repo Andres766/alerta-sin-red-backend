@@ -45,6 +45,23 @@ class ChangePasswordIn(InputModel):
     new_password: Annotated[str, StringConstraints(min_length=12, max_length=128)]
 
 
+class ZoneCreateIn(InputModel):
+    name: Annotated[str, StringConstraints(min_length=3, max_length=120)]
+    municipality: Annotated[str, StringConstraints(min_length=2, max_length=80)]
+    department: Annotated[str, StringConstraints(min_length=2, max_length=80)]
+    hazard_type: HazardType
+    susceptibility: int = Field(ge=1, le=5, description="Escala SGC: 1 muy baja – 5 muy alta")
+    slope_deg: float = Field(ge=0, le=90)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class ZoneUpdateIn(InputModel):
+    hazard_type: HazardType | None = None
+    susceptibility: int | None = Field(default=None, ge=1, le=5)
+    slope_deg: float | None = Field(default=None, ge=0, le=90)
+
+
 class UserCreateIn(InputModel):
     email: EmailStr
     # Política mínima: 12 caracteres (NIST SP 800-63B prioriza longitud sobre complejidad).
