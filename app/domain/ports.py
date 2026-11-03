@@ -9,6 +9,7 @@ Open-Meteo, Twilio, Android SMS Gateway, scikit-learn, etc.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from types import TracebackType
@@ -191,6 +192,14 @@ class ModelCard:
     metrics: dict[str, float]
     confusion_matrix: list[list[int]]
     labels: tuple[str, ...]
+
+
+class JobLock(ABC):
+    """Exclusión mutua para tareas que no deben ejecutarse en paralelo."""
+
+    @abstractmethod
+    def hold(self) -> AbstractContextManager[bool]:
+        """Context manager que entrega True si obtuvo el candado y False si está ocupado."""
 
 
 class RiskModel(ABC):

@@ -24,6 +24,7 @@ from app.api.routers import admin, auth, public
 from app.container import Container, build_container
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
+from app.domain.exceptions import ConflictError
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,11 @@ async def _periodic_evaluation(container: Container) -> None:
 
     def job() -> None:
         with container.uow_factory() as uow:
-            report = container.risk_service(uow).evaluate_all()
+            try:
+                report = container.risk_service(uow).evaluate_all()
+            except ConflictError:
+                logger.info("Evaluación programada omitida: ya hay una en curso")
+                return
             logger.info("Evaluación programada: %d zonas, %d fallos",
                         len(report.assessments), len(report.failures))
 

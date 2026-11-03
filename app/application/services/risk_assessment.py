@@ -9,8 +9,8 @@ from uuid import UUID
 from app.application.event_bus import EventBus
 from app.domain.entities import RiskAssessment, Zone
 from app.domain.events import RiskAssessed
-from app.domain.exceptions import ExternalServiceError, ZoneNotFoundError
-from app.domain.ports import RiskModel, UnitOfWork, WeatherProvider
+from app.domain.exceptions import ConflictError, ExternalServiceError, ZoneNotFoundError
+from app.domain.ports import JobLock, RiskModel, UnitOfWork, WeatherProvider
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,13 @@ class RiskAssessmentService:
         weather: WeatherProvider,
         model: RiskModel,
         events: EventBus,
+        lock: JobLock | None = None,
     ) -> None:
         self._uow = uow
         self._weather = weather
         self._model = model
         self._events = events
+        self._lock = lock
 
     def evaluate_zone(self, zone_id: UUID) -> RiskAssessment:
         zone = self._uow.zones.get(zone_id)
@@ -41,6 +43,19 @@ class RiskAssessmentService:
         return self._evaluate(zone)
 
     def evaluate_all(self) -> EvaluationReport:
+        """Evalúa todas las zonas; si ya hay una evaluación en curso, no la duplica.
+
+        Correr dos a la vez (tarea programada + botón del operador) duplicaría las
+        consultas a Open-Meteo y podría enviar SMS repetidos.
+        """
+        if self._lock is None:
+            return self._evaluate_all()
+        with self._lock.hold() as acquired:
+            if not acquired:
+                raise ConflictError("Ya hay una evaluación en curso; intente en un momento")
+            return self._evaluate_all()
+
+    def _evaluate_all(self) -> EvaluationReport:
         report = EvaluationReport()
         for zone in self._uow.zones.list_all():
             try:

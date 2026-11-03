@@ -37,6 +37,7 @@ from app.domain.entities import Role, utcnow
 from app.domain.events import RiskAssessed
 from app.domain.policies import AlertMessageBuilder, AlertPolicy
 from app.domain.ports import (
+    JobLock,
     PasswordHasher,
     RiskModel,
     SmsGateway,
@@ -44,9 +45,13 @@ from app.domain.ports import (
     UnitOfWork,
     WeatherProvider,
 )
+from app.infrastructure.locks import InProcessJobLock
 from app.infrastructure.seed import seed_zones
 
 logger = logging.getLogger(__name__)
+
+# Clave del advisory lock de PostgreSQL para la evaluación completa (número arbitrario fijo).
+EVALUATION_LOCK_KEY = 7_231_001
 
 
 class Container:
@@ -61,10 +66,12 @@ class Container:
         tokens: TokenService,
         http_client: httpx.Client | None = None,
         readiness_checks: dict[str, Callable[[], None]] | None = None,
+        evaluation_lock: JobLock | None = None,
     ) -> None:
         self.settings = settings
         # Verificaciones de disponibilidad (nombre -> función que lanza si falla).
         self.readiness_checks = readiness_checks or {}
+        self.evaluation_lock = evaluation_lock or InProcessJobLock()
         self.uow_factory = uow_factory
         self.weather = weather
         self.sms = sms
@@ -94,7 +101,7 @@ class Container:
             RiskAssessed,
             AlertDispatcher(uow, self.sms, self.alert_policy, self.message_builder, utcnow),
         )
-        return RiskAssessmentService(uow, self.weather, self.model, bus)
+        return RiskAssessmentService(uow, self.weather, self.model, bus, self.evaluation_lock)
 
     def subscription_service(self, uow: UnitOfWork) -> SubscriptionService:
         return SubscriptionService(uow)
@@ -168,6 +175,7 @@ def build_container(settings: Settings) -> Container:
     )
 
     readiness_checks: dict[str, Callable[[], None]] = {}
+    evaluation_lock: JobLock | None = None
     if settings.repository_backend == "memory":
         from app.infrastructure.memory.repositories import InMemoryStore, InMemoryUnitOfWork
 
@@ -184,6 +192,9 @@ def build_container(settings: Settings) -> Container:
         engine = build_engine(settings.database_url)
         session_factory = build_session_factory(engine)
         readiness_checks["database"] = lambda: ping_database(engine)
+        from app.infrastructure.locks import PostgresAdvisoryJobLock
+
+        evaluation_lock = PostgresAdvisoryJobLock(engine, key=EVALUATION_LOCK_KEY)
         cipher = PhoneCipher(
             settings.phone_encryption_key.get_secret_value(),
             settings.phone_index_key.get_secret_value(),
@@ -217,4 +228,5 @@ def build_container(settings: Settings) -> Container:
         ),
         http_client=http_client,
         readiness_checks=readiness_checks,
+        evaluation_lock=evaluation_lock,
     )
