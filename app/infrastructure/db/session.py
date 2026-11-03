@@ -28,29 +28,14 @@ def ping_database(engine: Engine) -> None:
         conn.execute(text("SELECT 1"))
 
 
-def init_db(engine: Engine) -> None:
-    """Crea la extensión PostGIS y las tablas si no existen.
+def init_db(engine: Engine) -> list[int]:
+    """Crea la extensión PostGIS y las tablas, y aplica las migraciones pendientes.
 
-    Para el avance se usa ``create_all``; la hoja de ruta contempla Alembic
-    para migraciones versionadas.
+    Devuelve las versiones de migración aplicadas en esta ejecución.
     """
+    from app.infrastructure.db.migrations import migrate
+
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     Base.metadata.create_all(engine)
-    _apply_additive_migrations(engine)
-
-
-# create_all no altera tablas existentes: las columnas nuevas se agregan aquí de
-# forma idempotente para no perder datos en bases ya desplegadas (p. ej. Render).
-_ADDITIVE_MIGRATIONS = (
-    "ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS cancel_token_hash VARCHAR(64)",
-    "ALTER TABLE alert_notifications "
-    "ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'ALERT'",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ",
-)
-
-
-def _apply_additive_migrations(engine: Engine) -> None:
-    with engine.begin() as conn:
-        for statement in _ADDITIVE_MIGRATIONS:
-            conn.execute(text(statement))
+    return migrate(engine)

@@ -1,7 +1,8 @@
 """Comandos de operación.
 
     python -m app.cli gen-keys     # genera secretos aleatorios para el .env
-    python -m app.cli init-db      # crea extensión PostGIS y tablas
+    python -m app.cli init-db      # crea extensión PostGIS, tablas y aplica migraciones
+    python -m app.cli migrations   # estado de las migraciones del esquema
     python -m app.cli seed         # zonas piloto + usuario administrador
     python -m app.cli evaluate     # ejecuta el modelo sobre todas las zonas
 """
@@ -22,7 +23,9 @@ def _gen_keys() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="alerta-sin-red")
-    parser.add_argument("command", choices=["gen-keys", "init-db", "seed", "evaluate"])
+    parser.add_argument(
+        "command", choices=["gen-keys", "init-db", "migrations", "seed", "evaluate"]
+    )
     command = parser.parse_args().command
 
     if command == "gen-keys":  # no requiere configuración previa
@@ -39,8 +42,17 @@ def main() -> None:
     if command == "init-db":
         from app.infrastructure.db.session import build_engine, init_db
 
-        init_db(build_engine(settings.database_url))
+        applied = init_db(build_engine(settings.database_url))
+        print(f"Migraciones aplicadas ahora: {applied or 'ninguna (al día)'}")
         print("Base de datos inicializada")
+        return
+
+    if command == "migrations":
+        from app.infrastructure.db.migrations import status
+        from app.infrastructure.db.session import build_engine
+
+        for version, description, applied_at in status(build_engine(settings.database_url)):
+            print(f"{version:>3}  {applied_at or 'PENDIENTE':<25} {description}")
         return
 
     container = build_container(settings)
