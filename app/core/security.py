@@ -23,11 +23,18 @@ from app.domain.value_objects import PhoneNumber
 class Argon2PasswordHasher(PasswordHasher):
     """Argon2id: ganador de la Password Hashing Competition, recomendado por OWASP."""
 
-    def __init__(self) -> None:
-        self._argon2 = _Argon2()
+    def __init__(self, argon2: _Argon2 | None = None) -> None:
+        # Parámetros por defecto de argon2-cffi (RFC 9106, perfil de bajo consumo de memoria).
+        self._argon2 = argon2 or _Argon2()
 
     def hash(self, password: str) -> str:
         return self._argon2.hash(password)
+
+    def needs_rehash(self, password_hash: str) -> bool:
+        try:
+            return self._argon2.check_needs_rehash(password_hash)
+        except InvalidHashError:
+            return True
 
     def verify(self, password_hash: str, password: str) -> bool:
         try:

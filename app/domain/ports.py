@@ -213,6 +213,10 @@ class PasswordHasher(ABC):
     @abstractmethod
     def verify(self, password_hash: str, password: str) -> bool: ...
 
+    @abstractmethod
+    def needs_rehash(self, password_hash: str) -> bool:
+        """True si el hash se generó con parámetros más débiles que los actuales."""
+
 
 @dataclass(frozen=True, slots=True)
 class TokenClaims:

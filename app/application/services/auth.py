@@ -43,6 +43,11 @@ class AuthService:
             self._audit.record(email.strip().lower(), AuditAction.LOGIN_FAILED)
             self._uow.commit()
             raise AuthenticationError("Credenciales inválidas")  # mensaje genérico a propósito
+        if self._hasher.needs_rehash(user.password_hash):
+            # Único momento en que se conoce la clave en claro: se aprovecha para
+            # actualizar el hash a los parámetros vigentes, sin pedir un cambio de clave.
+            user.password_hash = self._hasher.hash(password)
+            self._uow.users.add(user)
         self._audit.record(user.email, AuditAction.LOGIN_SUCCEEDED)
         self._uow.commit()
         claims = TokenClaims(subject=user.email, role=user.role.value)
