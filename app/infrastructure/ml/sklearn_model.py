@@ -10,7 +10,7 @@ import joblib
 import numpy as np
 
 from app.domain.exceptions import ModelIntegrityError
-from app.domain.ports import RiskModel
+from app.domain.ports import ModelCard, RiskModel
 from app.domain.value_objects import FEATURE_ORDER, RiskFeatures, RiskLevel, RiskPrediction
 
 
@@ -23,9 +23,10 @@ def sha256_of(path: Path) -> str:
 
 
 class SklearnRiskModel(RiskModel):
-    def __init__(self, estimator: object, version: str) -> None:
+    def __init__(self, estimator: object, version: str, metadata: dict | None = None) -> None:
         self._estimator = estimator
         self._version = version
+        self._metadata = metadata or {}
         self._classes = [RiskLevel(c) for c in estimator.classes_]  # type: ignore[attr-defined]
 
     @property
@@ -48,7 +49,24 @@ class SklearnRiskModel(RiskModel):
             raise ModelIntegrityError("La huella SHA-256 del modelo no coincide")
         if tuple(metadata.get("feature_order", ())) != FEATURE_ORDER:
             raise ModelIntegrityError("El modelo fue entrenado con otras variables")
-        return cls(joblib.load(model_path), version=metadata["version"])
+        return cls(joblib.load(model_path), version=metadata["version"], metadata=metadata)
+
+    def card(self) -> ModelCard:
+        meta = self._metadata
+        metrics = meta.get("metrics", {})
+        return ModelCard(
+            version=self._version,
+            algorithm=meta.get("algorithm", type(self._estimator).__name__),
+            trained_at=meta.get("trained_at", ""),
+            data_source=meta.get("data_source", "desconocido"),
+            n_samples=int(meta.get("n_samples", 0)),
+            feature_order=FEATURE_ORDER,
+            feature_importances=dict(meta.get("feature_importances", {})),
+            # Solo métricas escalares; la matriz de confusión va aparte.
+            metrics={k: float(v) for k, v in metrics.items() if isinstance(v, int | float)},
+            confusion_matrix=metrics.get("confusion_matrix", []),
+            labels=("BAJO", "MODERADO", "ALTO", "MUY_ALTO"),
+        )
 
     def predict(self, features: RiskFeatures) -> RiskPrediction:
         vector = np.asarray([features.as_vector()], dtype=float)

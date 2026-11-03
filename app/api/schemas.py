@@ -195,6 +195,20 @@ class ReadinessOut(BaseModel):
     checks: dict[str, str]
 
 
+class ModelCardOut(BaseModel):
+    version: str
+    algorithm: str
+    trained_at: str
+    data_source: str
+    n_samples: int
+    feature_order: list[str]
+    feature_importances: dict[str, float]
+    metrics: dict[str, float]
+    confusion_matrix: list[list[int]]
+    labels: list[str]
+    limitations: list[str]
+
+
 class HealthOut(BaseModel):
     status: str
     model_version: str

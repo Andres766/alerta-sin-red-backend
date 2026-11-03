@@ -157,6 +157,22 @@ class SmsGateway(ABC):
         """Nunca lanza por fallos del proveedor: devuelve ``SmsResult(success=False)``."""
 
 
+@dataclass(frozen=True, slots=True)
+class ModelCard:
+    """Ficha técnica del modelo: qué es, con qué datos se entrenó y qué tan bien rinde."""
+
+    version: str
+    algorithm: str
+    trained_at: str
+    data_source: str
+    n_samples: int
+    feature_order: tuple[str, ...]
+    feature_importances: dict[str, float]
+    metrics: dict[str, float]
+    confusion_matrix: list[list[int]]
+    labels: tuple[str, ...]
+
+
 class RiskModel(ABC):
     @property
     @abstractmethod
@@ -164,6 +180,9 @@ class RiskModel(ABC):
 
     @abstractmethod
     def predict(self, features: RiskFeatures) -> RiskPrediction: ...
+
+    @abstractmethod
+    def card(self) -> ModelCard: ...
 
 
 # --------------------------------------------------------------------------- #

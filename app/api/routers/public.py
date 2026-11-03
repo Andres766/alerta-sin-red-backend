@@ -12,6 +12,7 @@ from app.api.schemas import (
     AssessmentOut,
     CancelSubscriptionIn,
     HealthOut,
+    ModelCardOut,
     NearbyZoneOut,
     ReadinessOut,
     SnapshotOut,
@@ -48,6 +49,31 @@ def readiness(container: ContainerDep, response: Response) -> ReadinessOut:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     response.headers["Cache-Control"] = "no-store"
     return ReadinessOut(status="ready" if ready else "unavailable", checks=checks)
+
+
+# Limitaciones declaradas: parte de una IA honesta (se muestran junto a las métricas).
+MODEL_LIMITATIONS = [
+    "Fase 1: entrenado con datos sintéticos de base física; las métricas miden qué tan "
+    "bien aprende esa relación, no su acierto frente a eventos reales.",
+    "Fase 2 (pendiente): reentrenar con eventos reales de SIMMA (SGC) y DesInventar.",
+    "Usa lluvia absoluta: en la costa pacífica, más lluviosa, puede sobrestimar el riesgo "
+    "hasta calibrarse con la climatología local.",
+    "La susceptibilidad y la pendiente de las zonas piloto son provisionales.",
+]
+
+
+@router.get("/model", response_model=ModelCardOut, tags=["riesgo"])
+def model_card(container: ContainerDep, response: Response) -> ModelCardOut:
+    """Ficha técnica del modelo de IA: datos, métricas, variables más influyentes y límites."""
+    card = container.model.card()
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return ModelCardOut(
+        version=card.version, algorithm=card.algorithm, trained_at=card.trained_at,
+        data_source=card.data_source, n_samples=card.n_samples,
+        feature_order=list(card.feature_order), feature_importances=card.feature_importances,
+        metrics=card.metrics, confusion_matrix=card.confusion_matrix,
+        labels=list(card.labels), limitations=MODEL_LIMITATIONS,
+    )
 
 
 @router.get("/risk/snapshot", response_model=SnapshotOut, tags=["riesgo"])
