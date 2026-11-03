@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.security import PhoneCipher
 from app.domain.entities import (
     AlertNotification,
+    AuditAction,
+    AuditEntry,
     NotificationKind,
     NotificationStatus,
     RiskAssessment,
@@ -27,6 +29,7 @@ from app.domain.entities import (
 )
 from app.domain.ports import (
     AlertRepository,
+    AuditRepository,
     RiskAssessmentRepository,
     SubscriberRepository,
     UnitOfWork,
@@ -36,6 +39,7 @@ from app.domain.ports import (
 from app.domain.value_objects import Coordinates, PhoneNumber, RiskFeatures
 from app.infrastructure.db.models import (
     AlertNotificationModel,
+    AuditEntryModel,
     RiskAssessmentModel,
     SubscriberModel,
     UserModel,
@@ -348,6 +352,33 @@ class SqlUserRepository(UserRepository):
         )
 
 
+class SqlAuditRepository(AuditRepository):
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, entry: AuditEntry) -> None:
+        self._session.add(
+            AuditEntryModel(
+                id=entry.id,
+                actor=entry.actor,
+                action=entry.action.value,
+                target=entry.target,
+                details=entry.details,
+                created_at=entry.created_at,
+            )
+        )
+
+    def recent(self, limit: int) -> list[AuditEntry]:
+        rows = self._session.scalars(
+            select(AuditEntryModel).order_by(AuditEntryModel.created_at.desc()).limit(limit)
+        )
+        return [
+            AuditEntry(id=r.id, actor=r.actor, action=AuditAction(r.action), target=r.target,
+                       details=r.details, created_at=r.created_at)
+            for r in rows
+        ]
+
+
 class SqlAlchemyUnitOfWork(UnitOfWork):
     def __init__(self, session_factory: sessionmaker[Session], cipher: PhoneCipher) -> None:
         self._session_factory = session_factory
@@ -361,6 +392,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.subscribers = SqlSubscriberRepository(self._session, self._cipher)
         self.alerts = SqlAlertRepository(self._session)
         self.users = SqlUserRepository(self._session)
+        self.audit = SqlAuditRepository(self._session)
         return self
 
     def __exit__(self, *args: object) -> None:

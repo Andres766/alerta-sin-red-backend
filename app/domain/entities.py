@@ -206,3 +206,30 @@ class User:
 
     def activate(self) -> None:
         self.active = True
+
+
+class AuditAction(StrEnum):
+    LOGIN_SUCCEEDED = "LOGIN_SUCCEEDED"
+    LOGIN_FAILED = "LOGIN_FAILED"
+    USER_CREATED = "USER_CREATED"
+    USER_ACTIVATED = "USER_ACTIVATED"
+    USER_DEACTIVATED = "USER_DEACTIVATED"
+    EVALUATION_RUN = "EVALUATION_RUN"
+
+
+@dataclass(slots=True)
+class AuditEntry:
+    """Registro inmutable de una acción sensible: quién, qué, sobre qué y cuándo."""
+
+    actor: str
+    action: AuditAction
+    target: str | None = None
+    details: str | None = None
+    created_at: datetime = field(default_factory=utcnow)
+    id: UUID = field(default_factory=uuid4)
+
+    def __post_init__(self) -> None:
+        # Longitudes acotadas: la bitácora no debe convertirse en vía de abuso.
+        self.actor = self.actor[:254]
+        self.target = self.target[:254] if self.target else None
+        self.details = self.details[:255] if self.details else None

@@ -120,3 +120,15 @@ class UserModel(Base):
     role: Mapped[Role] = mapped_column(_enum(Role, "user_role"))
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AuditEntryModel(Base):
+    __tablename__ = "audit_log"
+    __table_args__ = (Index("ix_audit_time", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    actor: Mapped[str] = mapped_column(String(254))
+    action: Mapped[str] = mapped_column(String(40))
+    target: Mapped[str | None] = mapped_column(String(254))
+    details: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

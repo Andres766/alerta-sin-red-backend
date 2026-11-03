@@ -14,7 +14,14 @@ from datetime import datetime
 from types import TracebackType
 from uuid import UUID
 
-from app.domain.entities import AlertNotification, RiskAssessment, Subscriber, User, Zone
+from app.domain.entities import (
+    AlertNotification,
+    AuditEntry,
+    RiskAssessment,
+    Subscriber,
+    User,
+    Zone,
+)
 from app.domain.value_objects import (
     Coordinates,
     PhoneNumber,
@@ -102,6 +109,14 @@ class UserRepository(ABC):
     def add(self, user: User) -> None: ...
 
 
+class AuditRepository(ABC):
+    @abstractmethod
+    def add(self, entry: AuditEntry) -> None: ...
+
+    @abstractmethod
+    def recent(self, limit: int) -> list[AuditEntry]: ...
+
+
 class UnitOfWork(ABC):
     """Agrupa los repositorios bajo una misma transacción (patrón Unit of Work)."""
 
@@ -110,6 +125,7 @@ class UnitOfWork(ABC):
     subscribers: SubscriberRepository
     alerts: AlertRepository
     users: UserRepository
+    audit: AuditRepository
 
     def __enter__(self) -> UnitOfWork:
         return self

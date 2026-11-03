@@ -211,6 +211,15 @@ class ModelCardOut(BaseModel):
     limitations: list[str]
 
 
+class AuditEntryOut(BaseModel):
+    id: UUID
+    actor: str
+    action: str
+    target: str | None
+    details: str | None
+    created_at: datetime
+
+
 class HealthOut(BaseModel):
     status: str
     model_version: str

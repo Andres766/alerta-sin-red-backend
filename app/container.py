@@ -16,6 +16,7 @@ import httpx
 
 from app.application.event_bus import EventBus
 from app.application.services.alert_dispatcher import AlertDispatcher
+from app.application.services.audit import AuditTrail
 from app.application.services.auth import AuthService
 from app.application.services.dashboard import DashboardService
 from app.application.services.risk_assessment import RiskAssessmentService
@@ -99,8 +100,11 @@ class Container:
     def dashboard(self, uow: UnitOfWork) -> DashboardService:
         return DashboardService(uow)
 
+    def audit(self, uow: UnitOfWork) -> AuditTrail:
+        return AuditTrail(uow)
+
     def user_management(self, uow: UnitOfWork) -> UserManagementService:
-        return UserManagementService(uow, self.hasher)
+        return UserManagementService(uow, self.hasher, AuditTrail(uow))
 
     def auth_service(self, uow: UnitOfWork) -> AuthService:
         return AuthService(uow, self.hasher, self.tokens, self._dummy_hash)

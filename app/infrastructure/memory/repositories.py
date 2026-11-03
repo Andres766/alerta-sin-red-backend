@@ -14,6 +14,7 @@ from uuid import UUID
 
 from app.domain.entities import (
     AlertNotification,
+    AuditEntry,
     NotificationStatus,
     RiskAssessment,
     Subscriber,
@@ -22,6 +23,7 @@ from app.domain.entities import (
 )
 from app.domain.ports import (
     AlertRepository,
+    AuditRepository,
     RiskAssessmentRepository,
     SubscriberRepository,
     UnitOfWork,
@@ -38,6 +40,7 @@ class InMemoryStore:
     subscribers: dict[UUID, Subscriber] = field(default_factory=dict)
     alerts: list[AlertNotification] = field(default_factory=list)
     users: dict[str, User] = field(default_factory=dict)
+    audit: list[AuditEntry] = field(default_factory=list)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
@@ -152,6 +155,18 @@ class InMemoryUserRepository(UserRepository):
             self._s.users[user.email] = user
 
 
+class InMemoryAuditRepository(AuditRepository):
+    def __init__(self, store: InMemoryStore) -> None:
+        self._s = store
+
+    def add(self, entry: AuditEntry) -> None:
+        with self._s.lock:
+            self._s.audit.append(entry)
+
+    def recent(self, limit: int) -> list[AuditEntry]:
+        return sorted(self._s.audit, key=lambda e: e.created_at, reverse=True)[:limit]
+
+
 class InMemoryUnitOfWork(UnitOfWork):
     """Sin transacciones reales: commit/rollback solo registran la llamada."""
 
@@ -161,6 +176,7 @@ class InMemoryUnitOfWork(UnitOfWork):
         self.subscribers = InMemorySubscriberRepository(store)
         self.alerts = InMemoryAlertRepository(store)
         self.users = InMemoryUserRepository(store)
+        self.audit = InMemoryAuditRepository(store)
         self.commits = 0
 
     def commit(self) -> None:

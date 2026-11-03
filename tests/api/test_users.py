@@ -75,7 +75,7 @@ def test_siempre_queda_un_administrador_activo(container):
     with container.uow_factory() as uow:
         service = container.user_management(uow)
         admin = uow.users.get_by_email(ADMIN_EMAIL)
-        operator = service.create("op@x.co", "otra-clave-segura", Role.OPERATOR)
+        operator = service.create("op@x.co", "otra-clave-segura", Role.OPERATOR, admin)
         # Aunque lo pidiera otra cuenta, el único administrador activo no se desactiva.
         with pytest.raises(ConflictError):
             service.set_active(admin.id, False, acting_user=operator)

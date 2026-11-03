@@ -11,12 +11,13 @@ from app.api.deps import ContainerDep, CurrentUser, UowDep, require_role
 from app.api.schemas import (
     AlertOut,
     AssessmentOut,
+    AuditEntryOut,
     EvaluationOut,
     StatsOut,
     UserCreateIn,
     UserOut,
 )
-from app.domain.entities import Role
+from app.domain.entities import AuditAction, Role
 
 router = APIRouter(
     prefix="/admin",
@@ -26,9 +27,14 @@ router = APIRouter(
 
 
 @router.post("/evaluations", response_model=EvaluationOut)
-def run_evaluation(uow: UowDep, container: ContainerDep) -> EvaluationOut:
+def run_evaluation(uow: UowDep, container: ContainerDep, me: CurrentUser) -> EvaluationOut:
     """Ejecuta el modelo de IA sobre todas las zonas y dispara los SMS necesarios."""
     report = container.risk_service(uow).evaluate_all()
+    container.audit(uow).record(
+        me.email, AuditAction.EVALUATION_RUN,
+        details=f"{len(report.assessments)} zonas, {len(report.failures)} fallos",
+    )
+    uow.commit()
     return EvaluationOut(
         evaluated=len(report.assessments),
         failures=report.failures,
@@ -67,8 +73,10 @@ def list_users(uow: UowDep, container: ContainerDep) -> list[UserOut]:
     "/users", response_model=UserOut, status_code=status.HTTP_201_CREATED,
     dependencies=admin_only,
 )
-def create_user(body: UserCreateIn, uow: UowDep, container: ContainerDep) -> UserOut:
-    user = container.user_management(uow).create(body.email, body.password, body.role)
+def create_user(
+    body: UserCreateIn, me: CurrentUser, uow: UowDep, container: ContainerDep
+) -> UserOut:
+    user = container.user_management(uow).create(body.email, body.password, body.role, me)
     return UserOut.of(user)
 
 
@@ -84,3 +92,15 @@ def activate_user(
     user_id: UUID, me: CurrentUser, uow: UowDep, container: ContainerDep
 ) -> UserOut:
     return UserOut.of(container.user_management(uow).set_active(user_id, True, me))
+
+
+@router.get("/audit", response_model=list[AuditEntryOut], dependencies=admin_only)
+def audit_log(
+    uow: UowDep, container: ContainerDep, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> list[AuditEntryOut]:
+    """Bitácora de acciones sensibles, de la más reciente a la más antigua."""
+    return [
+        AuditEntryOut(id=e.id, actor=e.actor, action=e.action.value, target=e.target,
+                      details=e.details, created_at=e.created_at)
+        for e in container.audit(uow).recent(limit)
+    ]
