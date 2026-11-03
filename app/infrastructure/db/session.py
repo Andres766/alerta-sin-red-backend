@@ -46,6 +46,7 @@ _ADDITIVE_MIGRATIONS = (
     "ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS cancel_token_hash VARCHAR(64)",
     "ALTER TABLE alert_notifications "
     "ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'ALERT'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ",
 )
 
 

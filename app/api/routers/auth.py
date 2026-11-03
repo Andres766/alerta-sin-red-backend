@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import ContainerDep, CurrentUser, UowDep, rate_limited
-from app.api.schemas import LoginIn, TokenOut, UserOut
+from app.api.schemas import ChangePasswordIn, LoginIn, TokenOut, UserOut
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
 
@@ -30,3 +30,20 @@ def login(body: LoginIn, uow: UowDep, container: ContainerDep) -> TokenOut:
 def me(user: CurrentUser) -> UserOut:
     """Datos de la sesión actual (útil para que el panel muestre quién está conectado)."""
     return UserOut.of(user)
+
+
+@router.post("/change-password", response_model=TokenOut)
+def change_password(
+    body: ChangePasswordIn, user: CurrentUser, uow: UowDep, container: ContainerDep
+) -> TokenOut:
+    """Cambia la contraseña propia; las demás sesiones abiertas quedan cerradas."""
+    if not container.account_login_limiter.allow(f"login:{user.email}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Demasiados intentos para esta cuenta, intente más tarde",
+            {"Retry-After": "900"},
+        )
+    token = container.auth_service(uow).change_password(
+        user, body.current_password, body.new_password
+    )
+    return TokenOut(access_token=token.token, expires_in=token.expires_in, role=token.role)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.application.services.audit import AuditTrail
 from app.domain.entities import AuditAction, Role, User
-from app.domain.exceptions import AuthenticationError
+from app.domain.exceptions import AuthenticationError, ValidationError
 from app.domain.ports import PasswordHasher, TokenClaims, TokenService, UnitOfWork
 
 
@@ -44,6 +44,27 @@ class AuthService:
             self._uow.commit()
             raise AuthenticationError("Credenciales inválidas")  # mensaje genérico a propósito
         self._audit.record(user.email, AuditAction.LOGIN_SUCCEEDED)
+        self._uow.commit()
+        claims = TokenClaims(subject=user.email, role=user.role.value)
+        token, expires_in = self._tokens.issue(claims)
+        return AccessToken(token=token, expires_in=expires_in, role=user.role.value)
+
+    def change_password(self, user: User, current_password: str, new_password: str) -> AccessToken:
+        """Cambia la contraseña propia e invalida todas las sesiones anteriores.
+
+        Devuelve un token nuevo para que quien hizo el cambio siga conectado.
+        """
+        if not self._hasher.verify(user.password_hash, current_password):
+            self._audit.record(user.email, AuditAction.LOGIN_FAILED, details="cambio de clave")
+            self._uow.commit()
+            raise AuthenticationError("La contraseña actual no es correcta")
+        if current_password == new_password:
+            raise ValidationError("La nueva contraseña debe ser distinta de la actual")
+        if user.email.split("@")[0].lower() in new_password.lower():
+            raise ValidationError("La contraseña no debe contener su usuario")
+        user.change_password_hash(self._hasher.hash(new_password))
+        self._uow.users.add(user)
+        self._audit.record(user.email, AuditAction.PASSWORD_CHANGED)
         self._uow.commit()
         claims = TokenClaims(subject=user.email, role=user.role.value)
         token, expires_in = self._tokens.issue(claims)

@@ -68,7 +68,11 @@ class JwtTokenService(TokenService):
             )
         except jwt.PyJWTError as exc:
             raise AuthenticationError("Token inválido o expirado") from exc
-        return TokenClaims(subject=payload["sub"], role=payload.get("role", ""))
+        return TokenClaims(
+            subject=payload["sub"],
+            role=payload.get("role", ""),
+            issued_at=datetime.fromtimestamp(payload["iat"], UTC),
+        )
 
 
 class PhoneCipher:

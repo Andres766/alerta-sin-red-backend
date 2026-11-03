@@ -193,6 +193,23 @@ class User:
     active: bool = True
     created_at: datetime = field(default_factory=utcnow)
     id: UUID = field(default_factory=uuid4)
+    password_changed_at: datetime | None = None
+
+    def change_password_hash(self, new_hash: str) -> None:
+        self.password_hash = new_hash
+        self.password_changed_at = utcnow()
+
+    def accepts_token_issued_at(self, issued_at: datetime | None) -> bool:
+        """Los tokens emitidos antes del último cambio de contraseña ya no valen.
+
+        El claim iat de JWT tiene precisión de segundos, así que se compara contra
+        el cambio truncado al segundo.
+        """
+        if self.password_changed_at is None:
+            return True
+        if issued_at is None:
+            return False
+        return issued_at >= self.password_changed_at.replace(microsecond=0)
 
     def can_trigger_evaluations(self) -> bool:
         return self.active and self.role in (Role.ADMIN, Role.OPERATOR)
@@ -211,6 +228,7 @@ class User:
 class AuditAction(StrEnum):
     LOGIN_SUCCEEDED = "LOGIN_SUCCEEDED"
     LOGIN_FAILED = "LOGIN_FAILED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"  # noqa: S105 - nombre de evento, no una clave
     USER_CREATED = "USER_CREATED"
     USER_ACTIVATED = "USER_ACTIVATED"
     USER_DEACTIVATED = "USER_DEACTIVATED"

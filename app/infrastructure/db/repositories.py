@@ -319,6 +319,7 @@ def _to_user(row: UserModel) -> User:
         role=row.role,
         active=row.active,
         created_at=row.created_at,
+        password_changed_at=row.password_changed_at,
     )
 
 
@@ -348,6 +349,7 @@ class SqlUserRepository(UserRepository):
                 role=user.role,
                 active=user.active,
                 created_at=user.created_at,
+                password_changed_at=user.password_changed_at,
             )
         )
 

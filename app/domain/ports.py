@@ -218,6 +218,7 @@ class PasswordHasher(ABC):
 class TokenClaims:
     subject: str
     role: str
+    issued_at: datetime | None = None
 
 
 class TokenService(ABC):

@@ -120,6 +120,7 @@ class UserModel(Base):
     role: Mapped[Role] = mapped_column(_enum(Role, "user_role"))
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuditEntryModel(Base):

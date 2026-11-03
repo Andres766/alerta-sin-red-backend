@@ -48,10 +48,11 @@ def current_user(
     """Revalida el token contra la base de datos en cada petición.
 
     Un JWT sigue siendo válido hasta que expira; consultando al usuario, una
-    cuenta desactivada o con el rol cambiado pierde el acceso de inmediato.
+    cuenta desactivada, con el rol cambiado o con la contraseña cambiada después
+    de emitido el token pierde el acceso de inmediato.
     """
     user = uow.users.get_by_email(claims.subject)
-    if user is None or not user.active:
+    if user is None or not user.active or not user.accepts_token_issued_at(claims.issued_at):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "No autenticado", {"WWW-Authenticate": "Bearer"}
         )

@@ -40,6 +40,11 @@ class CancelSubscriptionIn(InputModel):
     cancel_token: Annotated[str, StringConstraints(min_length=20, max_length=100)]
 
 
+class ChangePasswordIn(InputModel):
+    current_password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
+    new_password: Annotated[str, StringConstraints(min_length=12, max_length=128)]
+
+
 class UserCreateIn(InputModel):
     email: EmailStr
     # Política mínima: 12 caracteres (NIST SP 800-63B prioriza longitud sobre complejidad).
