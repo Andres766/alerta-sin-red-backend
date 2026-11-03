@@ -190,6 +190,11 @@ class StatsOut(BaseModel):
     last_evaluation_at: datetime | None
 
 
+class ReadinessOut(BaseModel):
+    status: str
+    checks: dict[str, str]
+
+
 class HealthOut(BaseModel):
     status: str
     model_version: str

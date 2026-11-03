@@ -13,6 +13,7 @@ from app.api.schemas import (
     CancelSubscriptionIn,
     HealthOut,
     NearbyZoneOut,
+    ReadinessOut,
     SnapshotOut,
     SubscriptionIn,
     SubscriptionOut,
@@ -31,6 +32,22 @@ def health(container: ContainerDep) -> HealthOut:
         weather_provider=container.settings.weather_provider,
         sms_channel=container.sms.channel,
     )
+
+
+@router.get(
+    "/health/ready",
+    response_model=ReadinessOut,
+    tags=["sistema"],
+    responses={503: {"model": ReadinessOut, "description": "Alguna dependencia no responde"}},
+)
+def readiness(container: ContainerDep, response: Response) -> ReadinessOut:
+    """Disponibilidad: además de estar vivo, ¿puede atender? (p. ej. la base de datos responde)."""
+    checks = container.readiness()
+    ready = all(result == "ok" for result in checks.values())
+    if not ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    response.headers["Cache-Control"] = "no-store"
+    return ReadinessOut(status="ready" if ready else "unavailable", checks=checks)
 
 
 @router.get("/risk/snapshot", response_model=SnapshotOut, tags=["riesgo"])

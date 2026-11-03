@@ -56,8 +56,11 @@ class Container:
         hasher: PasswordHasher,
         tokens: TokenService,
         http_client: httpx.Client | None = None,
+        readiness_checks: dict[str, Callable[[], None]] | None = None,
     ) -> None:
         self.settings = settings
+        # Verificaciones de disponibilidad (nombre -> función que lanza si falla).
+        self.readiness_checks = readiness_checks or {}
         self.uow_factory = uow_factory
         self.weather = weather
         self.sms = sms
@@ -115,6 +118,18 @@ class Container:
                 )
         logger.info("Siembra completada: %d zonas nuevas", created)
 
+    def readiness(self) -> dict[str, str]:
+        """Ejecuta cada verificación y devuelve "ok" o el tipo de error (sin detalles internos)."""
+        results: dict[str, str] = {}
+        for name, check in self.readiness_checks.items():
+            try:
+                check()
+                results[name] = "ok"
+            except Exception as exc:  # noqa: BLE001 - se informa, no se propaga
+                logger.warning("Verificación de disponibilidad '%s' falló: %s", name, exc)
+                results[name] = f"error: {type(exc).__name__}"
+        return results
+
     def close(self) -> None:
         if self._http_client is not None:
             self._http_client.close()
@@ -134,6 +149,7 @@ def build_container(settings: Settings) -> Container:
         follow_redirects=False,
     )
 
+    readiness_checks: dict[str, Callable[[], None]] = {}
     if settings.repository_backend == "memory":
         from app.infrastructure.memory.repositories import InMemoryStore, InMemoryUnitOfWork
 
@@ -141,9 +157,15 @@ def build_container(settings: Settings) -> Container:
         uow_factory: Callable[[], UnitOfWork] = lambda: InMemoryUnitOfWork(store)  # noqa: E731
     else:
         from app.infrastructure.db.repositories import SqlAlchemyUnitOfWork
-        from app.infrastructure.db.session import build_engine, build_session_factory
+        from app.infrastructure.db.session import (
+            build_engine,
+            build_session_factory,
+            ping_database,
+        )
 
-        session_factory = build_session_factory(build_engine(settings.database_url))
+        engine = build_engine(settings.database_url)
+        session_factory = build_session_factory(engine)
+        readiness_checks["database"] = lambda: ping_database(engine)
         cipher = PhoneCipher(
             settings.phone_encryption_key.get_secret_value(),
             settings.phone_index_key.get_secret_value(),
@@ -171,4 +193,5 @@ def build_container(settings: Settings) -> Container:
             settings.jwt_expire_minutes,
         ),
         http_client=http_client,
+        readiness_checks=readiness_checks,
     )
