@@ -235,6 +235,7 @@ class AuditAction(StrEnum):
     EVALUATION_RUN = "EVALUATION_RUN"
     ZONE_CREATED = "ZONE_CREATED"
     ZONE_UPDATED = "ZONE_UPDATED"
+    SMS_TEST_SENT = "SMS_TEST_SENT"
 
 
 @dataclass(slots=True)

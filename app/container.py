@@ -20,6 +20,7 @@ from app.application.services.audit import AuditTrail
 from app.application.services.auth import AuthService
 from app.application.services.dashboard import DashboardService
 from app.application.services.risk_assessment import RiskAssessmentService
+from app.application.services.sms_test import SmsTestService
 from app.application.services.subscriptions import SubscriptionService
 from app.application.services.users import UserManagementService
 from app.application.services.zone_admin import ZoneAdminService
@@ -76,6 +77,8 @@ class Container:
         self.account_login_limiter = SlidingWindowRateLimiter(
             settings.login_attempts_per_account, 15 * 60
         )
+        # SMS de prueba: cuestan dinero con Twilio y no deben usarse para molestar a nadie.
+        self.sms_test_limiter = SlidingWindowRateLimiter(5, 3600)
         self.subscribe_limiter = SlidingWindowRateLimiter(
             settings.subscribe_rate_limit_per_hour, 3600
         )
@@ -103,6 +106,9 @@ class Container:
 
     def audit(self, uow: UnitOfWork) -> AuditTrail:
         return AuditTrail(uow)
+
+    def sms_test(self, uow: UnitOfWork) -> SmsTestService:
+        return SmsTestService(uow, self.sms, AuditTrail(uow))
 
     def zone_admin(self, uow: UnitOfWork) -> ZoneAdminService:
         return ZoneAdminService(uow, AuditTrail(uow))

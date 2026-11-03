@@ -62,6 +62,19 @@ class ZoneUpdateIn(InputModel):
     slope_deg: float | None = Field(default=None, ge=0, le=90)
 
 
+class SmsTestIn(InputModel):
+    phone: Annotated[str, StringConstraints(min_length=10, max_length=20,
+                                            pattern=r"^[0-9+\s\-().]+$")]
+
+
+class SmsTestOut(BaseModel):
+    success: bool
+    channel: str
+    phone_masked: str
+    provider_message_id: str | None
+    error: str | None
+
+
 class UserCreateIn(InputModel):
     email: EmailStr
     # Política mínima: 12 caracteres (NIST SP 800-63B prioriza longitud sobre complejidad).

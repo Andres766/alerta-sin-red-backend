@@ -7,12 +7,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import ContainerDep, CurrentUser, UowDep, require_role
+from app.api.deps import ContainerDep, CurrentUser, UowDep, rate_limited, require_role
 from app.api.schemas import (
     AlertOut,
     AssessmentOut,
     AuditEntryOut,
     EvaluationOut,
+    SmsTestIn,
+    SmsTestOut,
     StatsOut,
     UserCreateIn,
     UserOut,
@@ -22,6 +24,7 @@ from app.api.schemas import (
 )
 from app.application.services.zone_admin import NewZone, ZoneChanges
 from app.domain.entities import AuditAction, Role
+from app.domain.value_objects import PhoneNumber
 
 router = APIRouter(
     prefix="/admin",
@@ -132,3 +135,20 @@ def update_zone(
     """Actualiza la capa estática de una zona (tipo de amenaza, susceptibilidad, pendiente)."""
     zone = container.zone_admin(uow).update(zone_id, ZoneChanges(**body.model_dump()), me)
     return ZoneOut.of(zone)
+
+
+@router.post(
+    "/sms/test",
+    response_model=SmsTestOut,
+    dependencies=[*admin_only, Depends(rate_limited(lambda c: c.sms_test_limiter))],
+)
+def send_test_sms(
+    body: SmsTestIn, me: CurrentUser, uow: UowDep, container: ContainerDep
+) -> SmsTestOut:
+    """Envía un SMS de prueba para verificar la pasarela (máximo 5 por hora)."""
+    result = container.sms_test(uow).send(body.phone, me)
+    return SmsTestOut(
+        success=result.success, channel=container.sms.channel,
+        phone_masked=PhoneNumber.parse(body.phone).masked(),
+        provider_message_id=result.provider_message_id, error=result.error,
+    )
