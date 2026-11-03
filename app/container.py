@@ -179,6 +179,11 @@ def build_container(settings: Settings) -> Container:
         weather = OpenMeteoWeatherProvider(
             settings.open_meteo_forecast_url, settings.open_meteo_flood_url, http_client
         )
+    if settings.weather_cache_minutes > 0:
+        from app.infrastructure.weather.cached import CachedWeatherProvider
+
+        # Decorator: misma interfaz, con caché por coordenada.
+        weather = CachedWeatherProvider(weather, ttl_seconds=settings.weather_cache_minutes * 60)
 
     return Container(
         settings=settings,

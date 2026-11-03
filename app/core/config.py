@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
     open_meteo_flood_url: str = "https://flood-api.open-meteo.com/v1/flood"
     http_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    # Minutos que se reutiliza el clima de una coordenada (0 = sin caché).
+    weather_cache_minutes: int = Field(default=15, ge=0, le=120)
 
     # SMS
     sms_provider: Literal["console", "twilio", "android_gateway"] = "console"
