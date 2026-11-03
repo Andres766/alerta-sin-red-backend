@@ -39,6 +39,14 @@ class ZoneQueryService:
                                   i.zone.name))
         return RiskSnapshot(generated_at=utcnow(), items=items)
 
+    def detail(self, zone_id: UUID) -> ZoneRisk:
+        """Una zona con su última evaluación (para enlaces directos a una zona)."""
+        zone = self._uow.zones.get(zone_id)
+        if zone is None:
+            raise ZoneNotFoundError(str(zone_id))
+        latest = self._uow.assessments.history(zone_id, 1)
+        return ZoneRisk(zone, latest[0] if latest else None)
+
     def nearby(self, point: Coordinates, radius_km: float, limit: int) -> list[tuple[Zone, float]]:
         radius = min(radius_km, self.MAX_RADIUS_KM)
         return self._uow.zones.find_nearby(point, radius, limit)

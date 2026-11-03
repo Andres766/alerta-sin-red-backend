@@ -19,6 +19,7 @@ from app.api.schemas import (
     SubscriptionIn,
     SubscriptionOut,
     ZoneOut,
+    ZoneRiskOut,
 )
 from app.domain.value_objects import Coordinates
 
@@ -96,6 +97,15 @@ def nearby_zones(
     """Consulta espacial con PostGIS (``ST_DWithin`` sobre índice GiST)."""
     results = container.zone_queries(uow).nearby(Coordinates(lat, lon), radius_km, limit)
     return [NearbyZoneOut(zone=ZoneOut.of(z), distance_km=d) for z, d in results]
+
+
+@router.get("/zones/{zone_id}", response_model=ZoneRiskOut, tags=["zonas"])
+def zone_detail(
+    zone_id: UUID, uow: UowDep, container: ContainerDep, response: Response
+) -> ZoneRiskOut:
+    """Zona con su última evaluación: permite abrir un enlace directo sin el snapshot."""
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return ZoneRiskOut.of(container.zone_queries(uow).detail(zone_id))
 
 
 @router.get("/zones/{zone_id}/history", response_model=list[AssessmentOut], tags=["zonas"])
