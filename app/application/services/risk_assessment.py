@@ -63,7 +63,9 @@ class RiskAssessmentService:
             except ExternalServiceError as exc:
                 # Una zona sin datos no impide evaluar las demás.
                 logger.warning("No se pudo evaluar %s: %s", zone.name, exc)
-                report.failures[zone.name] = exc.code
+                # Código y causa: así el operador ve desde el panel si fue un
+                # tiempo de espera, un 429 o un fallo de conexión, sin abrir los logs.
+                report.failures[zone.name] = f"{exc.code}: {exc}"
         return report
 
     def _evaluate(self, zone: Zone) -> RiskAssessment:

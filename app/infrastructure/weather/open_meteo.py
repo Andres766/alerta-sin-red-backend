@@ -136,9 +136,14 @@ class OpenMeteoWeatherProvider(WeatherProvider):
                     continue
                 response.raise_for_status()
                 return response.json()
-            except (httpx.HTTPError, ValueError) as exc:
+            except httpx.HTTPStatusError as exc:
                 raise WeatherUnavailableError(
-                    f"Open-Meteo no respondió: {type(exc).__name__}"
+                    f"Open-Meteo respondió {exc.response.status_code} en {exc.request.url.host}"
+                ) from exc
+            except (httpx.HTTPError, ValueError) as exc:
+                host = httpx.URL(url).host
+                raise WeatherUnavailableError(
+                    f"Open-Meteo no respondió ({type(exc).__name__} en {host})"
                 ) from exc
         raise WeatherUnavailableError("Open-Meteo no respondió tras reintentar")  # inalcanzable
 
