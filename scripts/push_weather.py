@@ -30,6 +30,9 @@ WAKE_ATTEMPTS = 8
 WAKE_DELAY_SECONDS = 15
 # Pausa entre zonas: respeta el límite por minuto de Open-Meteo.
 PAUSE_BETWEEN_ZONES = 1.0
+# Si Open-Meteo no responde (cortes breves), se vuelve a intentar toda la lista.
+PASSES = 3
+PAUSE_BETWEEN_PASSES = 30.0
 
 
 def wake_up(api: httpx.Client) -> None:
@@ -51,28 +54,42 @@ def main() -> int:
         raise SystemExit("Faltan API_URL o WEATHER_INGEST_TOKEN")
 
     with httpx.Client(base_url=api_url, timeout=120.0) as api, httpx.Client(
-        timeout=20.0, headers={"User-Agent": "AlertaSinRed/0.1 (clima desde GitHub Actions)"}
+        timeout=httpx.Timeout(30.0, connect=15.0),
+        transport=httpx.HTTPTransport(retries=3),  # reintenta fallos de conexión
+        headers={"User-Agent": "AlertaSinRed/0.1 (clima desde GitHub Actions)"},
     ) as meteo:
         wake_up(api)
         zones = [item["zone"] for item in api.get("/api/v1/risk/snapshot").json()["items"]]
         provider = OpenMeteoWeatherProvider(FORECAST_URL, FLOOD_URL, meteo)
 
         observations: list[dict] = []
-        for zone in zones:
-            try:
-                c = provider.get_conditions(Coordinates(zone["latitude"], zone["longitude"]))
-            except WeatherUnavailableError as exc:
-                print(f"SIN CLIMA {zone['name']}: {exc}")
-                continue
-            observations.append({
-                "zone_id": zone["id"],
-                "rain_24h_mm": c.rain_24h_mm, "rain_72h_mm": c.rain_72h_mm,
-                "rain_7d_mm": c.rain_7d_mm, "rain_forecast_24h_mm": c.rain_forecast_24h_mm,
-                "soil_moisture": c.soil_moisture, "river_discharge_ratio": c.river_discharge_ratio,
-                "observed_at": c.observed_at.isoformat(), "source": c.source,
-            })
-            print(f"{zone['name']}: 72 h = {c.rain_72h_mm} mm, suelo = {c.soil_moisture}")
-            time.sleep(PAUSE_BETWEEN_ZONES)
+        pending = list(zones)
+        for attempt in range(1, PASSES + 1):
+            if attempt > 1:
+                print(f"Reintentando {len(pending)} zona(s) en {PAUSE_BETWEEN_PASSES:.0f} s "
+                      f"(pasada {attempt} de {PASSES})")
+                time.sleep(PAUSE_BETWEEN_PASSES)
+            failed: list[dict] = []
+            for zone in pending:
+                try:
+                    c = provider.get_conditions(Coordinates(zone["latitude"], zone["longitude"]))
+                except WeatherUnavailableError as exc:
+                    print(f"SIN CLIMA {zone['name']}: {exc}")
+                    failed.append(zone)
+                    continue
+                observations.append({
+                    "zone_id": zone["id"],
+                    "rain_24h_mm": c.rain_24h_mm, "rain_72h_mm": c.rain_72h_mm,
+                    "rain_7d_mm": c.rain_7d_mm, "rain_forecast_24h_mm": c.rain_forecast_24h_mm,
+                    "soil_moisture": c.soil_moisture,
+                    "river_discharge_ratio": c.river_discharge_ratio,
+                    "observed_at": c.observed_at.isoformat(), "source": c.source,
+                })
+                print(f"{zone['name']}: 72 h = {c.rain_72h_mm} mm, suelo = {c.soil_moisture}")
+                time.sleep(PAUSE_BETWEEN_ZONES)
+            pending = failed
+            if not pending:
+                break
 
         if not observations:
             print("Ninguna zona obtuvo clima; no se envía nada")
