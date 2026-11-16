@@ -45,7 +45,8 @@ def wake_up(api: httpx.Client) -> None:
 
 def main() -> int:
     api_url = os.environ.get("API_URL", "").rstrip("/")
-    token = os.environ.get("WEATHER_INGEST_TOKEN", "")
+    # strip(): al pegar el secreto en GitHub o Render suele colarse un salto de línea.
+    token = os.environ.get("WEATHER_INGEST_TOKEN", "").strip()
     if not api_url or not token:
         raise SystemExit("Faltan API_URL o WEATHER_INGEST_TOKEN")
 

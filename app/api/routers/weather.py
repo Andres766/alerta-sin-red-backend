@@ -30,7 +30,7 @@ def require_ingest_token(
         )
     # Comparación en tiempo constante: no revela cuántos caracteres coinciden.
     if not x_ingest_token or not hmac.compare_digest(
-        x_ingest_token.encode(), expected.get_secret_value().encode()
+        x_ingest_token.strip().encode(), expected.get_secret_value().strip().encode()
     ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token de ingesta inválido")
 
