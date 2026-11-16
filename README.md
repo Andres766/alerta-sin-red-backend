@@ -84,6 +84,7 @@ TEST_DATABASE_URL=postgresql://alerta:alerta@localhost:5432/alerta_test pytest t
 | GET | `/zones/nearby?lat=&lon=&radius_km=` | Público | Zonas cercanas (consulta espacial PostGIS) |
 | GET | `/zones/{id}` | Público | Una zona con su última evaluación |
 | GET | `/zones/{id}/history` | Público | Evaluaciones recientes de una zona |
+| GET | `/zones/{id}/days?days=30` | Público | Peor nivel de cada día (hora de Colombia) |
 | POST | `/subscriptions` | Público | Suscribe un celular a las alertas SMS de una zona |
 | POST | `/subscriptions/{id}/cancel` | Código de baja | Da de baja la suscripción |
 | POST | `/auth/login` | Público | Inicio de sesión de operadores (JWT) |
@@ -91,6 +92,7 @@ TEST_DATABASE_URL=postgresql://alerta:alerta@localhost:5432/alerta_test pytest t
 | POST | `/auth/change-password` | Operador | Cambia la clave propia y cierra las demás sesiones |
 | POST | `/admin/evaluations` | Operador | Ejecuta el modelo de IA y despacha SMS |
 | POST | `/weather/observations` | Token de ingesta | Recibe el clima por zona desde un trabajo externo y evalúa |
+| POST | `/weather/history` | Token de ingesta | Evalúa días pasados con su clima real (sin enviar SMS) |
 | GET | `/admin/alerts` · `/admin/stats` | Operador | SMS enviados e indicadores |
 | GET/POST | `/admin/users` | Administrador | Lista y crea cuentas |
 | POST | `/admin/users/{id}/activate` · `/deactivate` | Administrador | Activa o desactiva cuentas |
@@ -112,8 +114,18 @@ bloqueada:
 2. El servidor guarda una observación por zona (`weather_observations`) y evalúa el riesgo
    con ella. `StoredWeatherProvider` antepone la observación guardada, si tiene menos de
    `WEATHER_OBSERVATION_MAX_AGE_HOURS` (3 por defecto), al proveedor configurado.
-3. `.github/workflows/mantener-activo.yml` hace una petición a `/health` cada 10 minutos para
+3. En la misma ejecución completa el **historial**: para cada zona revisa qué días de los
+   últimos 30 no tienen evaluación (`GET /zones/{id}/days`), reconstruye el clima de esos
+   días con `OpenMeteoWeatherProvider.daily_history` y los envía a `POST /weather/history`.
+   Esas evaluaciones quedan con su fecha real y la fuente `open-meteo-historico`, y nunca
+   envían SMS. Si Render pasa un día dormido, el hueco se rellena en la siguiente ejecución.
+4. `.github/workflows/mantener-activo.yml` hace una petición a `/health` cada 10 minutos para
    que la instancia gratuita de Render no se duerma.
+
+GitHub no garantiza la hora de los trabajos programados y descarta algunos con carga alta;
+por eso `clima.yml` se programa dos veces por hora. Si Open-Meteo responde `429` al servidor,
+el adaptador deja de consultarlo durante 10 minutos (disyuntor) para no agotar el tiempo de
+la evaluación.
 
 Configuración: un mismo secreto en GitHub (**Settings → Secrets → Actions →
 `WEATHER_INGEST_TOKEN`**) y en Render (**Environment → `WEATHER_INGEST_TOKEN`**), de al menos

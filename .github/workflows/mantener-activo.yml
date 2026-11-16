@@ -13,11 +13,12 @@ permissions: {}
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     steps:
+      # Si la instancia estaba dormida, el primer intento puede agotar el tiempo
+      # mientras arranca: se reintenta en lugar de marcar el trabajo como fallido.
       - name: Petición de salud
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 \
-            https://alerta-sin-red-api.onrender.com/api/v1/health)
-          echo "health -> $code"
-          test "$code" = "200"
+          curl -sS -o /dev/null -w "health -> %{http_code} en %{time_total}s\n" \
+            --fail --max-time 100 --retry 4 --retry-delay 15 --retry-all-errors \
+            https://alerta-sin-red-api.onrender.com/api/v1/health

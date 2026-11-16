@@ -2,10 +2,16 @@ name: Clima cada hora
 
 # Open-Meteo limita por IP y la IP compartida de Render responde 429. Este
 # trabajo consulta el clima desde GitHub y se lo entrega a la API, que evalúa
-# el riesgo y envía los SMS. También se puede lanzar a mano desde Actions.
+# el riesgo y envía los SMS; además completa el historial de los últimos 30 días.
+# También se puede lanzar a mano desde Actions.
+#
+# GitHub no garantiza la hora de los trabajos programados y descarta algunos
+# cuando hay mucha carga: dos horarios por hora compensan las ejecuciones
+# perdidas (la API es idempotente y no repite SMS dentro del período de espera).
 on:
   schedule:
-    - cron: "17 * * * *" # minuto 17 de cada hora (UTC)
+    - cron: "17 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -18,7 +24,7 @@ concurrency:
 jobs:
   entregar-clima:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
