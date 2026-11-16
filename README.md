@@ -90,6 +90,7 @@ TEST_DATABASE_URL=postgresql://alerta:alerta@localhost:5432/alerta_test pytest t
 | GET | `/auth/me` | Operador | Datos de la sesión actual |
 | POST | `/auth/change-password` | Operador | Cambia la clave propia y cierra las demás sesiones |
 | POST | `/admin/evaluations` | Operador | Ejecuta el modelo de IA y despacha SMS |
+| POST | `/weather/observations` | Token de ingesta | Recibe el clima por zona desde un trabajo externo y evalúa |
 | GET | `/admin/alerts` · `/admin/stats` | Operador | SMS enviados e indicadores |
 | GET/POST | `/admin/users` | Administrador | Lista y crea cuentas |
 | POST | `/admin/users/{id}/activate` · `/deactivate` | Administrador | Activa o desactiva cuentas |
@@ -97,6 +98,27 @@ TEST_DATABASE_URL=postgresql://alerta:alerta@localhost:5432/alerta_test pytest t
 | POST | `/admin/zones` · PATCH `/admin/zones/{id}` | Administrador | Registra o actualiza zonas |
 | POST | `/admin/sms/test` | Administrador | SMS de prueba de la pasarela (máx. 5 por hora) |
 | GET | `/admin/audit` | Administrador | Bitácora de auditoría |
+
+## Clima desde GitHub Actions
+
+Open-Meteo limita las peticiones por IP y la IP de salida de Render (compartida con muchas
+aplicaciones gratuitas) recibe `429`. Por eso el clima no lo descarga el servidor sino un
+trabajo programado en GitHub Actions (`.github/workflows/clima.yml`), cuya IP no está
+bloqueada:
+
+1. Cada hora, `scripts/push_weather.py` consulta Open-Meteo para cada zona con **el mismo
+   adaptador** que usa el servidor (`OpenMeteoWeatherProvider`) y envía las observaciones a
+   `POST /weather/observations` con la cabecera `X-Ingest-Token`.
+2. El servidor guarda una observación por zona (`weather_observations`) y evalúa el riesgo
+   con ella. `StoredWeatherProvider` antepone la observación guardada, si tiene menos de
+   `WEATHER_OBSERVATION_MAX_AGE_HOURS` (3 por defecto), al proveedor configurado.
+3. `.github/workflows/mantener-activo.yml` hace una petición a `/health` cada 10 minutos para
+   que la instancia gratuita de Render no se duerma.
+
+Configuración: un mismo secreto en GitHub (**Settings → Secrets → Actions →
+`WEATHER_INGEST_TOKEN`**) y en Render (**Environment → `WEATHER_INGEST_TOKEN`**), de al menos
+32 caracteres (`python -c "import secrets; print(secrets.token_urlsafe(48))"`). Sin la
+variable, el endpoint responde `503` y el servidor sigue consultando Open-Meteo directamente.
 
 ## Despliegue
 

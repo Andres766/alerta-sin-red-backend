@@ -1,0 +1,36 @@
+name: Clima cada hora
+
+# Open-Meteo limita por IP y la IP compartida de Render responde 429. Este
+# trabajo consulta el clima desde GitHub y se lo entrega a la API, que evalúa
+# el riesgo y envía los SMS. También se puede lanzar a mano desde Actions.
+on:
+  schedule:
+    - cron: "17 * * * *" # minuto 17 de cada hora (UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clima
+  cancel-in-progress: false
+
+jobs:
+  entregar-clima:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar httpx
+        run: pip install "httpx>=0.27"
+
+      - name: Consultar Open-Meteo y entregar a la API
+        env:
+          API_URL: https://alerta-sin-red-api.onrender.com
+          WEATHER_INGEST_TOKEN: ${{ secrets.WEATHER_INGEST_TOKEN }}
+        run: python scripts/push_weather.py

@@ -44,6 +44,9 @@ services:
         sync: false
       - key: WEATHER_PROVIDER
         value: open_meteo
+      # Mismo valor que el secreto WEATHER_INGEST_TOKEN de GitHub Actions (ver README).
+      - key: WEATHER_INGEST_TOKEN
+        sync: false
       - key: SMS_PROVIDER
         value: console
       - key: SCHEDULER_ENABLED
