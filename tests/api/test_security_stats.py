@@ -2,6 +2,7 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.infrastructure.seed import SEED_ZONES
 from app.main import create_app
 from tests.conftest import make_container
 
@@ -34,7 +35,7 @@ def test_limite_por_cuenta_aunque_cambie_la_ip(store, sms, risk_model):
 def test_estadisticas_del_panel(client, admin_token):
     auth = {"Authorization": f"Bearer {admin_token}"}
     before = client.get(f"{API}/admin/stats", headers=auth).json()
-    assert before["zones_by_level"]["SIN_EVALUAR"] == 6
+    assert before["zones_by_level"]["SIN_EVALUAR"] == len(SEED_ZONES)
     assert before["last_evaluation_at"] is None
 
     snapshot = client.get(f"{API}/risk/snapshot").json()["items"]
@@ -45,6 +46,6 @@ def test_estadisticas_del_panel(client, admin_token):
 
     after = client.get(f"{API}/admin/stats", headers=auth).json()
     levels = after["zones_by_level"]
-    assert levels["SIN_EVALUAR"] == 0 and sum(levels.values()) == 6
+    assert levels["SIN_EVALUAR"] == 0 and sum(levels.values()) == len(SEED_ZONES)
     assert after["sms_sent_24h"] == 1 and after["sms_failed_24h"] == 0
     assert after["active_subscribers"] == 1 and after["last_evaluation_at"]

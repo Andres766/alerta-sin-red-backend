@@ -1,3 +1,5 @@
+from app.infrastructure.seed import SEED_ZONES
+
 API = "/api/v1"
 
 NUEVA = {
@@ -17,7 +19,7 @@ def test_crear_zona_la_incluye_en_el_snapshot_y_la_evaluacion(client, admin_toke
     names = [i["zone"]["name"] for i in client.get(f"{API}/risk/snapshot").json()["items"]]
     assert NUEVA["name"] in names
     report = client.post(f"{API}/admin/evaluations", headers=auth(admin_token)).json()
-    assert report["evaluated"] == 7
+    assert report["evaluated"] == len(SEED_ZONES) + 1
 
 
 def test_rechaza_nombre_repetido_y_coordenadas_fuera_de_colombia(client, admin_token):

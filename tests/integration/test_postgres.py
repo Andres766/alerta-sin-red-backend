@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.domain.entities import NotificationKind, utcnow
 from app.domain.value_objects import Coordinates
 from app.infrastructure.db.migrations import MIGRATIONS
+from app.infrastructure.seed import SEED_ZONES
 from app.infrastructure.weather.fake import FakeWeatherProvider
 
 PASTO = Coordinates(1.2136, -77.2811)
@@ -27,7 +28,7 @@ def test_ultima_evaluacion_por_zona_con_distinct_on(pg_container):
         pg_container.weather = FakeWeatherProvider("seco")
         second = pg_container.risk_service(uow).evaluate_all()
         latest = uow.assessments.latest_by_zone()
-    assert len(latest) == 6
+    assert len(latest) == len(SEED_ZONES)
     assert {a.id for a in latest.values()} == {a.id for a in second.assessments}
 
 
@@ -97,4 +98,4 @@ def test_observacion_de_clima_externa_se_guarda_y_se_usa(pg_container):
         report = pg_container.risk_service(uow).evaluate_all()
     assert len(report.assessments) == 1  # solo la zona con clima recibido
     assert report.assessments[0].weather_source == "open-meteo"
-    assert len(report.failures) == 5
+    assert len(report.failures) == len(SEED_ZONES) - 1

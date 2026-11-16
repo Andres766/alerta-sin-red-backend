@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+from app.infrastructure.seed import SEED_ZONES
+
 API = "/api/v1"
 
 
@@ -21,7 +23,7 @@ def test_cabeceras_de_seguridad(client):
 
 def test_snapshot_para_modo_offline(client):
     body = client.get(f"{API}/risk/snapshot").json()
-    assert len(body["items"]) == 6
+    assert len(body["items"]) == len(SEED_ZONES)
     assert body["items"][0]["assessment"] is None  # aún sin evaluar
 
 
@@ -83,7 +85,7 @@ def test_flujo_completo_evaluacion_y_alertas(client, admin_token, sms):
                 json={"phone": "3109876543", "zone_id": mocoa, "accepts_data_policy": True})
 
     res = client.post(f"{API}/admin/evaluations", headers=auth)
-    assert res.status_code == 200 and res.json()["evaluated"] == 6
+    assert res.status_code == 200 and res.json()["evaluated"] == len(SEED_ZONES)
 
     after = client.get(f"{API}/risk/snapshot").json()["items"]
     assert after[0]["assessment"]["level"] in ("ALTO", "MUY_ALTO")

@@ -2,6 +2,7 @@ import csv
 import io
 
 from app.application.services.reports import _safe
+from app.infrastructure.seed import SEED_ZONES
 
 API = "/api/v1"
 
@@ -18,7 +19,7 @@ def test_exporta_las_evaluaciones_en_csv(client, admin_token):
     assert "attachment" in res.headers["content-disposition"]
     text = res.content.decode("utf-8-sig")  # incluye BOM para Excel
     rows = list(csv.DictReader(io.StringIO(text)))
-    assert len(rows) == 6
+    assert len(rows) == len(SEED_ZONES)
     assert {"zona", "nivel", "probabilidad", "rain_72h_mm", "modelo"} <= set(rows[0])
     assert any(r["departamento"] == "Nariño" for r in rows)
 

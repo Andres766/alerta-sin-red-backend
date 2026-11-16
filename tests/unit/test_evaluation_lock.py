@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.exceptions import ConflictError
 from app.infrastructure.locks import InProcessJobLock
+from app.infrastructure.seed import SEED_ZONES
 
 API = "/api/v1"
 
@@ -39,7 +40,7 @@ def test_no_se_ejecutan_dos_evaluaciones_a_la_vez(container):
         container.risk_service(uow).evaluate_all()
     release.set()
     worker.join(5)
-    assert len(results["first"].assessments) == 6
+    assert len(results["first"].assessments) == len(SEED_ZONES)
 
 
 def test_el_operador_recibe_409_si_esta_ocupada(client, admin_token, container):
