@@ -20,7 +20,7 @@ from app.api.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.api.routers import admin, auth, public
+from app.api.routers import admin, auth, public, weather
 from app.container import Container, build_container
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
@@ -100,7 +100,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     app.add_middleware(RequestContextMiddleware)
 
     register_error_handlers(app)
-    for router in (public.router, auth.router, admin.router):
+    for router in (public.router, auth.router, admin.router, weather.router):
         app.include_router(router, prefix=settings.api_prefix)
     return app
 

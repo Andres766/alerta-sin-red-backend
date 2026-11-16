@@ -122,6 +122,18 @@ class AuditRepository(ABC):
     def recent(self, limit: int) -> list[AuditEntry]: ...
 
 
+class WeatherObservationRepository(ABC):
+    """Última observación de clima recibida por zona (de un trabajo externo)."""
+
+    @abstractmethod
+    def save(self, zone_id: UUID, point: Coordinates, conditions: WeatherConditions) -> None:
+        """Guarda o reemplaza la observación de la zona."""
+
+    @abstractmethod
+    def latest_near(self, point: Coordinates) -> WeatherConditions | None:
+        """Observación guardada para esa coordenada (~11 m de tolerancia), o None."""
+
+
 class UnitOfWork(ABC):
     """Agrupa los repositorios bajo una misma transacción (patrón Unit of Work)."""
 
@@ -131,6 +143,7 @@ class UnitOfWork(ABC):
     alerts: AlertRepository
     users: UserRepository
     audit: AuditRepository
+    observations: WeatherObservationRepository
 
     def __enter__(self) -> UnitOfWork:
         return self

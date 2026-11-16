@@ -76,6 +76,29 @@ class RiskAssessmentModel(Base):
     assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class WeatherObservationModel(Base):
+    """Última observación de clima recibida para cada zona (una fila por zona)."""
+
+    __tablename__ = "weather_observations"
+
+    zone_id: Mapped[UUID] = mapped_column(
+        ForeignKey("zones.id", ondelete="CASCADE"), primary_key=True
+    )
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    rain_24h_mm: Mapped[float] = mapped_column(Float)
+    rain_72h_mm: Mapped[float] = mapped_column(Float)
+    rain_7d_mm: Mapped[float] = mapped_column(Float)
+    rain_forecast_24h_mm: Mapped[float] = mapped_column(Float)
+    soil_moisture: Mapped[float] = mapped_column(Float)
+    river_discharge_ratio: Mapped[float] = mapped_column(Float)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(String(40))
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class SubscriberModel(Base):
     __tablename__ = "subscribers"
     __table_args__ = (UniqueConstraint("zone_id", "phone_index", name="uq_subscriber_zone_phone"),)

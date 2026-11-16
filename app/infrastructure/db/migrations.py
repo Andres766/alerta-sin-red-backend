@@ -37,6 +37,21 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(3, "Fecha del último cambio de contraseña", (
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ",
     )),
+    Migration(4, "Observaciones de clima recibidas por zona", (
+        "CREATE TABLE IF NOT EXISTS weather_observations ("
+        " zone_id UUID PRIMARY KEY REFERENCES zones(id) ON DELETE CASCADE,"
+        " latitude DOUBLE PRECISION NOT NULL,"
+        " longitude DOUBLE PRECISION NOT NULL,"
+        " rain_24h_mm DOUBLE PRECISION NOT NULL,"
+        " rain_72h_mm DOUBLE PRECISION NOT NULL,"
+        " rain_7d_mm DOUBLE PRECISION NOT NULL,"
+        " rain_forecast_24h_mm DOUBLE PRECISION NOT NULL,"
+        " soil_moisture DOUBLE PRECISION NOT NULL,"
+        " river_discharge_ratio DOUBLE PRECISION NOT NULL,"
+        " observed_at TIMESTAMPTZ NOT NULL,"
+        " source VARCHAR(40) NOT NULL,"
+        " received_at TIMESTAMPTZ NOT NULL DEFAULT now())",
+    )),
 )
 
 _CREATE_TABLE = text(

@@ -24,6 +24,7 @@ from app.application.services.risk_assessment import RiskAssessmentService
 from app.application.services.sms_test import SmsTestService
 from app.application.services.subscriptions import SubscriptionService
 from app.application.services.users import UserManagementService
+from app.application.services.weather_ingest import WeatherIngestService
 from app.application.services.zone_admin import ZoneAdminService
 from app.application.services.zones import ZoneQueryService
 from app.core.config import Settings
@@ -47,6 +48,7 @@ from app.domain.ports import (
 )
 from app.infrastructure.locks import InProcessJobLock
 from app.infrastructure.seed import seed_zones
+from app.infrastructure.weather.stored import StoredWeatherProvider
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,15 @@ class Container:
             RiskAssessed,
             AlertDispatcher(uow, self.sms, self.alert_policy, self.message_builder, utcnow),
         )
-        return RiskAssessmentService(uow, self.weather, self.model, bus, self.evaluation_lock)
+        # Primero el clima recibido de fuera (si es reciente); si no, el proveedor configurado.
+        weather = StoredWeatherProvider(
+            uow.observations, self.weather,
+            timedelta(hours=self.settings.weather_observation_max_age_hours),
+        )
+        return RiskAssessmentService(uow, weather, self.model, bus, self.evaluation_lock)
+
+    def weather_ingest(self, uow: UnitOfWork) -> WeatherIngestService:
+        return WeatherIngestService(uow, self.risk_service(uow), AuditTrail(uow))
 
     def subscription_service(self, uow: UnitOfWork) -> SubscriptionService:
         return SubscriptionService(uow)

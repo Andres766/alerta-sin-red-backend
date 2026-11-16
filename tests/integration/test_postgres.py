@@ -70,3 +70,31 @@ def test_bitacora_persistente(pg_container):
         pg_container.auth_service(uow).login("admin@test.co", "clave-integracion-12")
         actions = [e.action.value for e in uow.audit.recent(5)]
     assert "LOGIN_SUCCEEDED" in actions
+
+
+def test_observacion_de_clima_externa_se_guarda_y_se_usa(pg_container):
+    from app.domain.exceptions import WeatherUnavailableError
+    from app.domain.ports import WeatherProvider
+    from app.domain.value_objects import WeatherConditions
+
+    class Blocked(WeatherProvider):
+        def get_conditions(self, point):
+            raise WeatherUnavailableError("Open-Meteo respondió 429")
+
+    pg_container.weather = Blocked()
+    with pg_container.uow_factory() as uow:
+        zone = next(z for z in uow.zones.list_all() if "Mocoa" in z.name)
+        conditions = WeatherConditions(
+            rain_24h_mm=55, rain_72h_mm=120, rain_7d_mm=190, rain_forecast_24h_mm=60,
+            soil_moisture=0.47, river_discharge_ratio=2.6, observed_at=utcnow(),
+            source="open-meteo",
+        )
+        uow.observations.save(zone.id, zone.location, conditions)
+        uow.observations.save(zone.id, zone.location, conditions)  # reemplaza, no duplica
+        uow.commit()
+        assert uow.observations.latest_near(zone.location) == conditions
+
+        report = pg_container.risk_service(uow).evaluate_all()
+    assert len(report.assessments) == 1  # solo la zona con clima recibido
+    assert report.assessments[0].weather_source == "open-meteo"
+    assert len(report.failures) == 5

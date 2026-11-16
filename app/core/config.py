@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     # Minutos que se reutiliza el clima de una coordenada (0 = sin caché).
     weather_cache_minutes: int = Field(default=15, ge=0, le=120)
+    # Clima recibido de un trabajo externo (GitHub Actions): token del endpoint de
+    # ingesta (sin token, el endpoint queda apagado) y vigencia de cada observación.
+    weather_ingest_token: SecretStr | None = None
+    weather_observation_max_age_hours: int = Field(default=3, ge=1, le=48)
 
     # SMS
     sms_provider: Literal["console", "twilio", "android_gateway"] = "console"
@@ -106,6 +110,8 @@ class Settings(BaseSettings):
     def _validate_security(self) -> Settings:
         if len(self.jwt_secret.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET debe tener al menos 32 caracteres")
+        if self.weather_ingest_token and len(self.weather_ingest_token.get_secret_value()) < 32:
+            raise ValueError("WEATHER_INGEST_TOKEN debe tener al menos 32 caracteres")
         if self.is_production:
             if "cambiar" in self.jwt_secret.get_secret_value().lower():
                 raise ValueError("JWT_SECRET de ejemplo no permitido en producción")

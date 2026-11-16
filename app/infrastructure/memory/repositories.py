@@ -28,9 +28,10 @@ from app.domain.ports import (
     SubscriberRepository,
     UnitOfWork,
     UserRepository,
+    WeatherObservationRepository,
     ZoneRepository,
 )
-from app.domain.value_objects import Coordinates, PhoneNumber
+from app.domain.value_objects import Coordinates, PhoneNumber, WeatherConditions
 
 
 @dataclass
@@ -41,6 +42,7 @@ class InMemoryStore:
     alerts: list[AlertNotification] = field(default_factory=list)
     users: dict[str, User] = field(default_factory=dict)
     audit: list[AuditEntry] = field(default_factory=list)
+    observations: dict[UUID, tuple[Coordinates, WeatherConditions]] = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
@@ -171,6 +173,26 @@ class InMemoryAuditRepository(AuditRepository):
         return sorted(self._s.audit, key=lambda e: e.created_at, reverse=True)[:limit]
 
 
+class InMemoryWeatherObservationRepository(WeatherObservationRepository):
+    TOLERANCE = 1e-4
+
+    def __init__(self, store: InMemoryStore) -> None:
+        self._s = store
+
+    def save(self, zone_id: UUID, point: Coordinates, conditions: WeatherConditions) -> None:
+        with self._s.lock:
+            self._s.observations[zone_id] = (point, conditions)
+
+    def latest_near(self, point: Coordinates) -> WeatherConditions | None:
+        with self._s.lock:
+            matches = [
+                c for p, c in self._s.observations.values()
+                if abs(p.latitude - point.latitude) < self.TOLERANCE
+                and abs(p.longitude - point.longitude) < self.TOLERANCE
+            ]
+        return max(matches, key=lambda c: c.observed_at) if matches else None
+
+
 class InMemoryUnitOfWork(UnitOfWork):
     """Sin transacciones reales: commit/rollback solo registran la llamada."""
 
@@ -181,6 +203,7 @@ class InMemoryUnitOfWork(UnitOfWork):
         self.alerts = InMemoryAlertRepository(store)
         self.users = InMemoryUserRepository(store)
         self.audit = InMemoryAuditRepository(store)
+        self.observations = InMemoryWeatherObservationRepository(store)
         self.commits = 0
 
     def commit(self) -> None:

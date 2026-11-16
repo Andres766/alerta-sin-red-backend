@@ -87,6 +87,22 @@ class LoginIn(InputModel):
     password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
 
 
+class WeatherObservationIn(InputModel):
+    zone_id: UUID
+    rain_24h_mm: float = Field(ge=0, le=2000)
+    rain_72h_mm: float = Field(ge=0, le=5000)
+    rain_7d_mm: float = Field(ge=0, le=10000)
+    rain_forecast_24h_mm: float = Field(ge=0, le=2000)
+    soil_moisture: float = Field(ge=0, le=1)
+    river_discharge_ratio: float = Field(ge=0, le=50)
+    observed_at: datetime
+    source: Annotated[str, StringConstraints(min_length=2, max_length=40)] = "open-meteo"
+
+
+class WeatherIngestIn(InputModel):
+    observations: list[WeatherObservationIn] = Field(min_length=1, max_length=200)
+
+
 # ------------------------------- Salidas ----------------------------------- #
 
 
@@ -187,6 +203,13 @@ class EvaluationOut(BaseModel):
     evaluated: int
     failures: dict[str, str]
     assessments: list[AssessmentOut]
+
+
+class WeatherIngestOut(BaseModel):
+    stored: int
+    unknown_zones: list[UUID]
+    evaluated: int
+    failures: dict[str, str]
 
 
 class AlertOut(BaseModel):

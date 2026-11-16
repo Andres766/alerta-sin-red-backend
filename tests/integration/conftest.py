@@ -27,7 +27,8 @@ pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL no definido (requiere PostgreSQL + PostGIS)"
 )
 
-_TABLES = ("audit_log", "alert_notifications", "subscribers", "risk_assessments", "users", "zones")
+_TABLES = ("audit_log", "alert_notifications", "subscribers", "risk_assessments",
+           "weather_observations", "users", "zones")
 
 
 @pytest.fixture(scope="session")

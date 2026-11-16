@@ -34,15 +34,17 @@ from app.domain.ports import (
     SubscriberRepository,
     UnitOfWork,
     UserRepository,
+    WeatherObservationRepository,
     ZoneRepository,
 )
-from app.domain.value_objects import Coordinates, PhoneNumber, RiskFeatures
+from app.domain.value_objects import Coordinates, PhoneNumber, RiskFeatures, WeatherConditions
 from app.infrastructure.db.models import (
     AlertNotificationModel,
     AuditEntryModel,
     RiskAssessmentModel,
     SubscriberModel,
     UserModel,
+    WeatherObservationModel,
     ZoneModel,
 )
 
@@ -390,6 +392,49 @@ class SqlAuditRepository(AuditRepository):
         ]
 
 
+class SqlWeatherObservationRepository(WeatherObservationRepository):
+    # Tolerancia para considerar iguales dos coordenadas (~11 m).
+    TOLERANCE = 1e-4
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save(self, zone_id: UUID, point: Coordinates, conditions: WeatherConditions) -> None:
+        row = self._session.get(WeatherObservationModel, zone_id)
+        if row is None:
+            row = WeatherObservationModel(zone_id=zone_id)
+            self._session.add(row)
+        row.latitude = point.latitude
+        row.longitude = point.longitude
+        row.rain_24h_mm = conditions.rain_24h_mm
+        row.rain_72h_mm = conditions.rain_72h_mm
+        row.rain_7d_mm = conditions.rain_7d_mm
+        row.rain_forecast_24h_mm = conditions.rain_forecast_24h_mm
+        row.soil_moisture = conditions.soil_moisture
+        row.river_discharge_ratio = conditions.river_discharge_ratio
+        row.observed_at = conditions.observed_at
+        row.source = conditions.source
+        self._session.flush()
+
+    def latest_near(self, point: Coordinates) -> WeatherConditions | None:
+        stmt = (
+            select(WeatherObservationModel)
+            .where(func.abs(WeatherObservationModel.latitude - point.latitude) < self.TOLERANCE)
+            .where(func.abs(WeatherObservationModel.longitude - point.longitude) < self.TOLERANCE)
+            .order_by(WeatherObservationModel.observed_at.desc())
+            .limit(1)
+        )
+        row = self._session.scalars(stmt).first()
+        if row is None:
+            return None
+        return WeatherConditions(
+            rain_24h_mm=row.rain_24h_mm, rain_72h_mm=row.rain_72h_mm, rain_7d_mm=row.rain_7d_mm,
+            rain_forecast_24h_mm=row.rain_forecast_24h_mm, soil_moisture=row.soil_moisture,
+            river_discharge_ratio=row.river_discharge_ratio, observed_at=row.observed_at,
+            source=row.source,
+        )
+
+
 class SqlAlchemyUnitOfWork(UnitOfWork):
     def __init__(self, session_factory: sessionmaker[Session], cipher: PhoneCipher) -> None:
         self._session_factory = session_factory
@@ -404,6 +449,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.alerts = SqlAlertRepository(self._session)
         self.users = SqlUserRepository(self._session)
         self.audit = SqlAuditRepository(self._session)
+        self.observations = SqlWeatherObservationRepository(self._session)
         return self
 
     def __exit__(self, *args: object) -> None:
