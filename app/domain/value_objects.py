@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 
 from app.domain.exceptions import (
@@ -13,6 +13,9 @@ from app.domain.exceptions import (
     InvalidPhoneNumberError,
     ValidationError,
 )
+
+# Nariño y Putumayo: hora de Colombia (UTC-5, sin horario de verano).
+COLOMBIA_TZ = timezone(timedelta(hours=-5), "COT")
 
 
 class RiskLevel(StrEnum):

@@ -64,3 +64,29 @@ def test_no_reintenta_errores_del_cliente():
     with pytest.raises(WeatherUnavailableError):
         p.get_conditions(Coordinates(1.21, -77.28))
     assert waits == []
+
+
+def test_tras_un_429_persistente_deja_de_consultar_un_rato():
+    calls: list[str] = []
+    now = [0.0]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        return httpx.Response(429)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    p = OpenMeteoWeatherProvider(FORECAST, FLOOD, client,
+                                 sleep=lambda _: None, clock=lambda: now[0])
+    with pytest.raises(WeatherUnavailableError, match="429"):
+        p.get_conditions(Coordinates(1.21, -77.28))
+    assert len(calls) == 3
+
+    # Otra zona en la misma evaluación: falla al instante, sin gastar reintentos.
+    with pytest.raises(WeatherUnavailableError, match="limitó"):
+        p.get_conditions(Coordinates(1.62, -78.67))
+    assert len(calls) == 3
+
+    now[0] += OpenMeteoWeatherProvider.BLOCK_SECONDS + 1  # pasada la pausa, vuelve a intentar
+    with pytest.raises(WeatherUnavailableError):
+        p.get_conditions(Coordinates(1.21, -77.28))
+    assert len(calls) == 6
