@@ -8,14 +8,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 from app.application.services.subscriptions import SubscriptionResult
-from app.application.services.zones import RiskSnapshot, ZoneRisk
+from app.application.services.zones import DayRisk, RiskSnapshot, ZoneRisk
 from app.domain.entities import AlertNotification, RiskAssessment, Role, Subscriber, User, Zone
 from app.domain.value_objects import HazardType, RiskLevel
 
@@ -203,6 +203,23 @@ class EvaluationOut(BaseModel):
     evaluated: int
     failures: dict[str, str]
     assessments: list[AssessmentOut]
+
+
+class DayRiskOut(BaseModel):
+    day: date
+    level: RiskLevel
+    probability: float
+    evaluations: int
+
+    @classmethod
+    def of(cls, d: DayRisk) -> DayRiskOut:
+        return cls(day=d.day, level=d.level, probability=d.probability, evaluations=d.evaluations)
+
+
+class HistoryIngestOut(BaseModel):
+    created: int
+    skipped: int
+    unknown_zones: list[UUID]
 
 
 class WeatherIngestOut(BaseModel):

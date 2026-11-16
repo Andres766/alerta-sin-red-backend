@@ -12,7 +12,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.deps import ContainerDep, UowDep
-from app.api.schemas import WeatherIngestIn, WeatherIngestOut
+from app.api.schemas import (
+    HistoryIngestOut,
+    WeatherIngestIn,
+    WeatherIngestOut,
+    WeatherObservationIn,
+)
 from app.application.services.weather_ingest import ZoneObservation
 from app.domain.value_objects import WeatherConditions
 
@@ -44,7 +49,32 @@ def ingest_observations(
     payload: WeatherIngestIn, uow: UowDep, container: ContainerDep
 ) -> WeatherIngestOut:
     """Guarda el clima de cada zona y evalúa el riesgo con el modelo de IA."""
-    observations = [
+    report = container.weather_ingest(uow).ingest(_observations(payload.observations))
+    return WeatherIngestOut(
+        stored=report.stored,
+        unknown_zones=report.unknown_zones,
+        evaluated=len(report.evaluation.assessments),
+        failures=report.evaluation.failures,
+    )
+
+
+@router.post(
+    "/history",
+    response_model=HistoryIngestOut,
+    dependencies=[Depends(require_ingest_token)],
+)
+def ingest_history(
+    payload: WeatherIngestIn, uow: UowDep, container: ContainerDep
+) -> HistoryIngestOut:
+    """Evalúa días pasados con su clima real para completar el historial (sin enviar SMS)."""
+    report = container.history_backfill(uow).backfill(_observations(payload.observations))
+    return HistoryIngestOut(
+        created=report.created, skipped=report.skipped, unknown_zones=report.unknown_zones
+    )
+
+
+def _observations(items: list[WeatherObservationIn]) -> list[ZoneObservation]:
+    return [
         ZoneObservation(
             zone_id=o.zone_id,
             conditions=WeatherConditions(
@@ -54,12 +84,5 @@ def ingest_observations(
                 source=o.source,
             ),
         )
-        for o in payload.observations
+        for o in items
     ]
-    report = container.weather_ingest(uow).ingest(observations)
-    return WeatherIngestOut(
-        stored=report.stored,
-        unknown_zones=report.unknown_zones,
-        evaluated=len(report.evaluation.assessments),
-        failures=report.evaluation.failures,
-    )

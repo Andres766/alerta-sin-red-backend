@@ -24,7 +24,7 @@ from app.application.services.risk_assessment import RiskAssessmentService
 from app.application.services.sms_test import SmsTestService
 from app.application.services.subscriptions import SubscriptionService
 from app.application.services.users import UserManagementService
-from app.application.services.weather_ingest import WeatherIngestService
+from app.application.services.weather_ingest import HistoryBackfillService, WeatherIngestService
 from app.application.services.zone_admin import ZoneAdminService
 from app.application.services.zones import ZoneQueryService
 from app.core.config import Settings
@@ -112,6 +112,9 @@ class Container:
 
     def weather_ingest(self, uow: UnitOfWork) -> WeatherIngestService:
         return WeatherIngestService(uow, self.risk_service(uow), AuditTrail(uow))
+
+    def history_backfill(self, uow: UnitOfWork) -> HistoryBackfillService:
+        return HistoryBackfillService(uow, self.model, AuditTrail(uow))
 
     def subscription_service(self, uow: UnitOfWork) -> SubscriptionService:
         return SubscriptionService(uow)

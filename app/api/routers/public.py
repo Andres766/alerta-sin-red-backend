@@ -11,6 +11,7 @@ from app.api.deps import ContainerDep, UowDep, rate_limited
 from app.api.schemas import (
     AssessmentOut,
     CancelSubscriptionIn,
+    DayRiskOut,
     HealthOut,
     ModelCardOut,
     NearbyZoneOut,
@@ -116,6 +117,19 @@ def zone_history(
     limit: Annotated[int, Query(ge=1, le=100)] = 24,
 ) -> list[AssessmentOut]:
     return [AssessmentOut.of(a) for a in container.zone_queries(uow).history(zone_id, limit)]
+
+
+@router.get("/zones/{zone_id}/days", response_model=list[DayRiskOut], tags=["zonas"])
+def zone_days(
+    zone_id: UUID,
+    uow: UowDep,
+    container: ContainerDep,
+    response: Response,
+    days: Annotated[int, Query(ge=1, le=90)] = 30,
+) -> list[DayRiskOut]:
+    """Peor nivel de cada día (hora de Colombia) en los últimos ``days`` días."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return [DayRiskOut.of(d) for d in container.zone_queries(uow).daily(zone_id, days)]
 
 
 @router.post(

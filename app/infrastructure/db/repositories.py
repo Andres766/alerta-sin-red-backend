@@ -176,6 +176,15 @@ class SqlRiskAssessmentRepository(RiskAssessmentRepository):
         )
         return [_to_assessment(r) for r in self._session.scalars(stmt)]
 
+    def zone_since(self, zone_id: UUID, moment: datetime) -> list[RiskAssessment]:
+        stmt = (
+            select(RiskAssessmentModel)
+            .where(RiskAssessmentModel.zone_id == zone_id)
+            .where(RiskAssessmentModel.assessed_at >= moment)
+            .order_by(RiskAssessmentModel.assessed_at)
+        )
+        return [_to_assessment(r) for r in self._session.scalars(stmt)]
+
     def since(self, moment: datetime, limit: int) -> list[RiskAssessment]:
         stmt = (
             select(RiskAssessmentModel)

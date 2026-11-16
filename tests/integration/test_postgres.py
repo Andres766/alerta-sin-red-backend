@@ -99,3 +99,26 @@ def test_observacion_de_clima_externa_se_guarda_y_se_usa(pg_container):
     assert len(report.assessments) == 1  # solo la zona con clima recibido
     assert report.assessments[0].weather_source == "open-meteo"
     assert len(report.failures) == len(SEED_ZONES) - 1
+
+
+def test_historial_por_dia_con_evaluaciones_de_dias_pasados(pg_container):
+    from app.application.services.weather_ingest import ZoneObservation
+    from app.domain.value_objects import WeatherConditions
+
+    with pg_container.uow_factory() as uow:
+        zone = uow.zones.list_all()[0]
+        moments = [utcnow().replace(microsecond=0) - timedelta(days=d) for d in (3, 2, 1)]
+        observations = [
+            ZoneObservation(zone.id, WeatherConditions(
+                rain_24h_mm=5, rain_72h_mm=15, rain_7d_mm=40, rain_forecast_24h_mm=5,
+                soil_moisture=0.3, river_discharge_ratio=1.0, observed_at=m,
+                source="open-meteo-historico"))
+            for m in moments
+        ]
+        first = pg_container.history_backfill(uow).backfill(observations)
+        second = pg_container.history_backfill(uow).backfill(observations)
+        since = uow.assessments.zone_since(zone.id, moments[0])
+        days = pg_container.zone_queries(uow).daily(zone.id, 7)
+    assert (first.created, second.created, second.skipped) == (3, 0, 3)
+    assert [a.assessed_at for a in since] == moments  # cronológico y con su fecha real
+    assert len(days) == 3 and sum(d.evaluations for d in days) == 3

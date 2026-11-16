@@ -88,6 +88,10 @@ class InMemoryRiskAssessmentRepository(RiskAssessmentRepository):
         rows = [a for a in self._s.assessments if a.zone_id == zone_id]
         return sorted(rows, key=lambda a: a.assessed_at, reverse=True)[:limit]
 
+    def zone_since(self, zone_id: UUID, moment: datetime) -> list[RiskAssessment]:
+        rows = [a for a in self._s.assessments if a.zone_id == zone_id and a.assessed_at >= moment]
+        return sorted(rows, key=lambda a: a.assessed_at)
+
     def since(self, moment: datetime, limit: int) -> list[RiskAssessment]:
         rows = [a for a in self._s.assessments if a.assessed_at >= moment]
         return sorted(rows, key=lambda a: a.assessed_at)[:limit]
